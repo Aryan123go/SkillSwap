@@ -1,0 +1,18 @@
+export const initialSkills = [
+  { name: 'React', category: 'Technology', aliases: ['React.js'] },
+  { name: 'JavaScript', category: 'Technology', aliases: ['JS'] },
+  { name: 'HTML', category: 'Technology' },
+  { name: 'CSS', category: 'Technology' },
+  { name: 'Python', category: 'Technology' },
+  { name: 'UI/UX Design', category: 'Design' },
+  { name: 'Figma', category: 'Design' },
+  { name: 'Graphic Design', category: 'Design' },
+  { name: 'Photography', category: 'Creative' },
+  { name: 'Video Editing', category: 'Creative' },
+  { name: 'Guitar', category: 'Music' },
+  { name: 'Piano', category: 'Music' },
+  { name: 'Spanish', category: 'Languages' },
+  { name: 'French', category: 'Languages' },
+  { name: 'Public Speaking', category: 'Communication' },
+  { name: 'Academic Writing', category: 'Academic' },
+]

@@ -9,8 +9,7 @@ export async function requireAuth(request, _response, next) {
 
     const payload = verifyToken(token)
     const user = await User.findById(payload.sub)
-      .populate('skillsToTeach.skill', 'name category aliases')
-      .populate('skillsToLearn.skill', 'name category aliases')
+      .select('name email role profileImage bio college skillsToTeach skillsToLearn availability createdAt updatedAt')
     if (!user) throw new HttpError(401, 'Your session is no longer valid.', 'INVALID_SESSION')
 
     request.user = user

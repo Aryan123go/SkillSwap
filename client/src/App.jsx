@@ -12,6 +12,8 @@ import {
   RegisterPage,
   ServiceUnavailablePage,
 } from './pages.jsx'
+import { DiscoveryPage } from './DiscoveryPage.jsx'
+import { RequestsPage } from './RequestsPage.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -30,6 +32,9 @@ function ApplicationRoutes() {
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+    <Route path="/discover" element={<ProtectedRoute><DiscoveryPage /></ProtectedRoute>} />
+    <Route path="/requests/sent" element={<ProtectedRoute><RequestsPage direction="sent" /></ProtectedRoute>} />
+    <Route path="/requests/received" element={<ProtectedRoute><RequestsPage direction="received" /></ProtectedRoute>} />
     <Route path="/profile" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />
     <Route path="/profile/edit" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
     <Route path="/profile/:id" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />

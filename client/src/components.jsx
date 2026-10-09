@@ -30,6 +30,9 @@ export function Header({ compact = false }) {
       <Brand />
       {!compact && user && <nav className="main-nav" aria-label="Main navigation">
         <NavLink to="/dashboard">Dashboard</NavLink>
+        <NavLink to="/discover">Discover</NavLink>
+        <NavLink to="/requests/sent">Sent requests</NavLink>
+        <NavLink to="/requests/received">Received requests</NavLink>
         <NavLink to="/profile">My profile</NavLink>
       </nav>}
       <div className="account-actions">

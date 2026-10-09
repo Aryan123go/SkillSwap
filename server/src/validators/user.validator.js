@@ -10,8 +10,8 @@ export const updateUserSchema = z.object({
   bio: z.string().trim().max(500),
   college: z.string().trim().max(120),
   profileImage: z.string().trim().max(2048).optional(),
-  skillsToTeach: z.array(userSkill).max(100),
-  skillsToLearn: z.array(userSkill).max(100),
+  skillsToTeach: z.array(userSkill),
+  skillsToLearn: z.array(userSkill),
   availability: z.object({
     days: z.array(z.enum(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])).max(7),
     timezone: z.string().trim().max(80),

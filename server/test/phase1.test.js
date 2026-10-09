@@ -48,6 +48,22 @@ test('profile validation rejects duplicated selected skills', () => {
   assert.equal(duplicate.success, false)
 })
 
+test('profile validation does not impose an artificial skill-count cap', () => {
+  const skillsToTeach = Array.from({ length: 101 }, (_, index) => ({
+    skill: index.toString(16).padStart(24, '0'),
+    proficiency: 'BEGINNER',
+  }))
+  const parsed = updateUserSchema.safeParse({
+    name: 'Student Name',
+    bio: '',
+    college: '',
+    skillsToTeach,
+    skillsToLearn: [],
+  })
+  assert.equal(parsed.success, true)
+  assert.equal(parsed.data.skillsToTeach.length, 101)
+})
+
 test('development accepts loopback Vite fallback ports while production requires an allowlisted origin', async () => {
   const previousEnvironment = {
     nodeEnv: process.env.NODE_ENV,

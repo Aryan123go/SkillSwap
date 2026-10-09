@@ -46,6 +46,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+userSchema.index({ role: 1, college: 1 })
+userSchema.index({ role: 1, 'skillsToTeach.skill': 1 })
+userSchema.index({ role: 1, 'skillsToLearn.skill': 1 })
+
 userSchema.set('toJSON', {
   transform(_document, result) {
     delete result.passwordHash

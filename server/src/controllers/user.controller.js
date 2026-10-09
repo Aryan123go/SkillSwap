@@ -3,6 +3,30 @@ import Skill from '../models/Skill.js'
 import User from '../models/User.js'
 import { HttpError } from '../utils/HttpError.js'
 import { toSafeUser } from '../services/auth.service.js'
+import { discoverStudents as findStudents } from '../services/matching.service.js'
+import { discoveryQuerySchema } from '../validators/discovery.validator.js'
+
+async function runDiscovery(request, response, recommendationsOnly) {
+  const parsed = discoveryQuerySchema.safeParse(request.query)
+  if (!parsed.success) {
+    throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid discovery filters.', 'VALIDATION_ERROR')
+  }
+  await request.user.populate([
+    { path: 'skillsToTeach.skill', select: 'name normalizedName aliases category' },
+    { path: 'skillsToLearn.skill', select: 'name normalizedName aliases category' },
+  ])
+  const filters = { ...parsed.data, page: Number(parsed.data.page), limit: Number(parsed.data.limit) }
+  const result = await findStudents(request.user, filters, recommendationsOnly)
+  response.json({ success: true, data: result })
+}
+
+export async function discoverStudents(request, response) {
+  return runDiscovery(request, response, false)
+}
+
+export async function getRecommendations(request, response) {
+  return runDiscovery(request, response, true)
+}
 
 async function validateSkillReferences(entries) {
   const ids = [...new Set(entries.map((entry) => entry.skill))]
@@ -17,10 +41,11 @@ async function validateSkillReferences(entries) {
 }
 
 export async function getMyProfile(request, response) {
-  const user = await User.findById(request.user._id)
-    .populate('skillsToTeach.skill', 'name category aliases')
-    .populate('skillsToLearn.skill', 'name category aliases')
-  response.json({ success: true, data: { user: toSafeUser(user) } })
+  await request.user.populate([
+    { path: 'skillsToTeach.skill', select: 'name category aliases' },
+    { path: 'skillsToLearn.skill', select: 'name category aliases' },
+  ])
+  response.json({ success: true, data: { user: toSafeUser(request.user) } })
 }
 
 export async function updateMyProfile(request, response) {

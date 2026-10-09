@@ -41,7 +41,8 @@ export function logout(_request, response) {
   response.json({ success: true, data: { message: 'You have been signed out.' } })
 }
 
-export function currentUser(request, response) {
+export async function currentUser(request, response) {
   if (!request.user) throw new HttpError(401, 'Please sign in to continue.', 'AUTHENTICATION_REQUIRED')
+  await populateUserSkills(request.user)
   response.json({ success: true, data: { user: toSafeUser(request.user) } })
 }

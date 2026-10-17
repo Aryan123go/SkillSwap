@@ -86,6 +86,7 @@
 .student-card-head p, .request-card-head p { margin: 0; color: #81877f; font-size: 10px; }
 .match-score { display: flex; width: 50px; height: 50px; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; margin-left: auto; border-radius: 50%; background: #f0f4ed; color: #35674c; font-size: 13px; font-weight: 700; }
 .match-score small { font-size: 8px; font-weight: 500; }
+.match-score-breakdown { margin: -5px 0 10px; color: #81877f; font-size: 9px; line-height: 1.6; }
 .student-bio { margin: 13px 0; color: #717b72; font-size: 11px; line-height: 1.6; }
 .match-reasons { display: grid; gap: 5px; padding: 11px 12px 11px 28px; margin: 12px 0; border-radius: 6px; background: #f5f7f1; color: #4c6b53; font-size: 10px; line-height: 1.5; }
 .student-skill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 17px; }
@@ -136,4 +137,31 @@
 }
 @media (max-width: 540px) {
   .topbar { padding: 0 17px; }.brand { font-size: 18px; }.brand-mark { width: 27px; height: 27px; }.account-actions { gap: 11px; }.header-user { display: none; }.main-nav { gap: 13px; font-size: 10px; }.join-button { padding: 10px 11px; }.hero { min-height: 0; padding: 48px 22px 61px; }.hero h1 { font-size: clamp(42px, 12vw, 57px); letter-spacing: -2.8px; }.hero-description br { display: none; }.hero-art { width: min(100%, 360px); margin-top: 12px; }.hero-bottom { right: 22px; bottom: 23px; left: 22px; gap: 9px; font-size: 7px; letter-spacing: .7px; }.bottom-line { width: 25px; }.intro-section { padding: 48px 20px; }.intro-section h2 { font-size: 25px; }.intro-steps { grid-template-columns: 1fr; gap: 10px; }.intro-steps article { padding: 18px; }.auth-card { padding: 29px 23px; margin-top: 32px; }.page-heading { align-items: start; flex-direction: column; }.page-heading h1 { font-size: 27px; }.completion-card { grid-template-columns: 1fr; gap: 18px; padding: 18px; }.dashboard-grid { grid-template-columns: 1fr; }.profile-card { align-items: start; padding: 19px; }.profile-avatar { width: 58px; height: 58px; font-size: 18px; }.profile-bio { min-width: 0; }.skill-options { grid-template-columns: 1fr; }.skill-option { min-height: 43px; }.site-footer .topbar { height: 64px; }.inline-banner { margin-right: 12px; margin-left: 12px; }
+}
+
+.session-page-heading { align-items: center; }
+.session-page-grid { display: grid; grid-template-columns: minmax(280px, .78fr) minmax(0, 1.22fr); align-items: start; gap: 22px; }
+.session-proposal { position: sticky; top: 20px; }
+.session-groups, .session-list { display: grid; gap: 22px; }
+.session-group { min-width: 0; }
+.session-card { display: grid; gap: 10px; padding: 19px; border: 1px solid #e9e8e1; border-radius: 9px; background: #fff; }
+.session-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+.session-card-heading h2 { margin: 7px 0 0; color: #2b3e33; font-size: 16px; }
+.session-card-heading h2 a:hover, .session-partner a:hover, .session-participants a:hover { color: #285d43; text-decoration: underline; }
+.session-partner, .session-description, .session-time { margin: 0; color: #737971; font-size: 12px; line-height: 1.65; }
+.session-time strong { color: #3e5446; }
+.session-detail-card { margin-bottom: 18px; }
+.session-detail-card > .session-card-heading h2 { font-size: 21px; }
+.session-participants, .session-related-request { display: grid; gap: 9px; padding-top: 16px; margin-top: 6px; border-top: 1px solid #eeede8; }
+.session-participants > div { display: flex; flex-wrap: wrap; gap: 12px; color: #3c6148; font-size: 12px; font-weight: 600; }
+.session-related-request > p { margin: 0; color: #737971; font-size: 12px; }
+.session-related-request .secondary-button { width: fit-content; }
+.session-action-card { display: grid; gap: 15px; }
+.session-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.session-reschedule { padding-top: 15px; border-top: 1px solid #eeede8; }
+.session-action-card .form-field input[type="datetime-local"] { min-width: 0; }
+.session-action-card .subtle-text { margin: 0; }
+@media (max-width: 760px) {
+  .session-page-grid { grid-template-columns: 1fr; }
+  .session-proposal { position: static; }
 }

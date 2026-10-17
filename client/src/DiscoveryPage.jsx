@@ -53,12 +53,17 @@ function StudentCard({ student, user, onRequested }) {
         ? <img className="student-avatar" src={student.profileImage} alt="" />
         : <div className="student-avatar student-avatar-fallback" aria-hidden="true">{student.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</div>}
       <div><h2>{student.name}</h2><p>{student.college || 'College not provided'}</p></div>
-      <span className="match-score">{student.matchScore}%<small>match</small></span>
+      <span className="match-score">{student.matchScore}<small>match score</small></span>
     </div>
     {student.bio && <p className="student-bio">{student.bio}</p>}
     {student.matchReasons.length > 0
       ? <ul className="match-reasons">{student.matchReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
       : <p className="subtle-text">No complementary skill match yet. You can still view this profile.</p>}
+    {student.scoreComponents && <p className="match-score-breakdown">
+      Score points: skills {student.scoreComponents.skillMatchPoints.theyCanTeachMe + student.scoreComponents.skillMatchPoints.iCanTeachThem}/60
+      {' · '}proficiency {student.scoreComponents.proficiencyBonus.theyCanTeachMe + student.scoreComponents.proficiencyBonus.iCanTeachThem}/20
+      {' · '}mutual {student.scoreComponents.mutualExchangeBonus}/20
+    </p>}
     <div className="student-skill-grid">
       <div><h3>Can teach</h3><SkillList entries={student.skillsToTeach} emptyText="No teaching skills listed." /></div>
       <div><h3>Wants to learn</h3><SkillList entries={student.skillsToLearn} emptyText="No learning skills listed." /></div>

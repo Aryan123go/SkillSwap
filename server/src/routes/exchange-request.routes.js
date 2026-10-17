@@ -3,6 +3,7 @@ import {
   acceptRequest,
   cancelRequest,
   createExchangeRequest,
+  getAcceptedRequests,
   getReceivedRequests,
   getRequest,
   getSentRequests,
@@ -18,6 +19,7 @@ router.use(requireAuth)
 router.post('/', validateBody(createExchangeRequestSchema), createExchangeRequest)
 router.get('/sent', getSentRequests)
 router.get('/received', getReceivedRequests)
+router.get('/accepted', getAcceptedRequests)
 router.get('/:id', getRequest)
 router.patch('/:id/accept', acceptRequest)
 router.patch('/:id/reject', rejectRequest)

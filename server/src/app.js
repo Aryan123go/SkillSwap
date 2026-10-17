@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/user.routes.js'
 import skillRoutes from './routes/skill.routes.js'
 import exchangeRequestRoutes from './routes/exchange-request.routes.js'
+import sessionRoutes from './routes/session.routes.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import { HttpError } from './utils/HttpError.js'
 
@@ -73,6 +74,7 @@ export function createApp() {
   app.use('/api/users', userRoutes)
   app.use('/api/skills', skillRoutes)
   app.use('/api/exchange-requests', exchangeRequestRoutes)
+  app.use('/api/sessions', sessionRoutes)
   app.use(notFoundHandler)
   app.use(errorHandler)
   return app

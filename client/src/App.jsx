@@ -14,6 +14,7 @@ import {
 } from './pages.jsx'
 import { DiscoveryPage } from './DiscoveryPage.jsx'
 import { RequestsPage } from './RequestsPage.jsx'
+import { SessionDetailPage, SessionsPage } from './SessionsPage.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -35,6 +36,8 @@ function ApplicationRoutes() {
     <Route path="/discover" element={<ProtectedRoute><DiscoveryPage /></ProtectedRoute>} />
     <Route path="/requests/sent" element={<ProtectedRoute><RequestsPage direction="sent" /></ProtectedRoute>} />
     <Route path="/requests/received" element={<ProtectedRoute><RequestsPage direction="received" /></ProtectedRoute>} />
+    <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
+    <Route path="/sessions/:id" element={<ProtectedRoute><SessionDetailPage /></ProtectedRoute>} />
     <Route path="/profile" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />
     <Route path="/profile/edit" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
     <Route path="/profile/:id" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />

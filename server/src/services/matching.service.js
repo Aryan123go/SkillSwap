@@ -3,105 +3,222 @@ import Skill from '../models/Skill.js'
 import User from '../models/User.js'
 import { normalizeSkill } from '../utils/normalizeSkill.js'
 
+const SCORE_WEIGHTS = Object.freeze({
+  exactSkill: 10,
+  aliasSkill: 7,
+  skillPointsPerDirectionCap: 30,
+  compatibleProficiency: 5,
+  proficiencyPointsPerDirectionCap: 10,
+  mutualExchange: 20,
+})
+
+const PROFICIENCY_LEVELS = Object.freeze({
+  BEGINNER: 0,
+  INTERMEDIATE: 1,
+  ADVANCED: 2,
+  EXPERT: 3,
+})
+
+function idString(value) {
+  if (value?._id) return value._id.toString()
+  if (typeof value === 'string') return value
+  if (typeof value?.toHexString === 'function') return value.toHexString()
+  return ''
+}
+
+function getSkill(entry) {
+  return entry?.skill && typeof entry.skill === 'object' ? entry.skill : null
+}
+
+function skillName(skill) {
+  if (!skill) return ''
+  const name = skill.normalizedName || skill.name
+  return typeof name === 'string' ? normalizeSkill(name) : ''
+}
+
 function skillTerms(skill) {
-  if (!skill || typeof skill === 'string') return []
-  return [...new Set([skill.name, ...(skill.aliases ?? [])].map(normalizeSkill).filter(Boolean))]
+  const name = skillName(skill)
+  const aliases = Array.isArray(skill?.aliases) ? skill.aliases : []
+  return [...new Set([name, ...aliases.map((alias) => (
+    typeof alias === 'string' ? normalizeSkill(alias) : ''
+  ))].filter(Boolean))]
 }
 
-const proficiencyValues = { BEGINNER: 0, INTERMEDIATE: 1, ADVANCED: 2, EXPERT: 3 }
+function proficiencyValue(entry) {
+  return Object.hasOwn(PROFICIENCY_LEVELS, entry?.proficiency)
+    ? PROFICIENCY_LEVELS[entry.proficiency]
+    : undefined
+}
 
-function proficiencyEntries(entries) {
-  return (entries ?? []).flatMap((entry) => {
-    const terms = skillTerms(entry.skill)
-    const level = proficiencyValues[entry.proficiency]
-    return terms.length && level !== undefined ? [{ terms, level }] : []
+function uniqueEntries(entries = []) {
+  const seen = new Set()
+  return entries.filter((entry) => {
+    const skill = getSkill(entry)
+    const key = idString(skill) || skillName(skill)
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
   })
 }
 
-function hasCompatibleProficiency(teacherEntries, learnerEntries) {
-  return teacherEntries.some((teacher) => {
-    const teacherTerms = new Set(skillTerms(teacher.skill))
-    return learnerEntries.some((learner) => (
-      teacher.proficiency in proficiencyValues
-      && learner.proficiency in proficiencyValues
-      && proficiencyValues[teacher.proficiency] >= proficiencyValues[learner.proficiency]
-      && skillTerms(learner.skill).some((term) => teacherTerms.has(term))
-    ))
-  })
+function compareEntries(left, right) {
+  const nameOrder = skillName(getSkill(left)).localeCompare(skillName(getSkill(right)), 'en')
+  if (nameOrder !== 0) return nameOrder
+  return idString(getSkill(left)).localeCompare(idString(getSkill(right)), 'en')
 }
 
-function distinctMatchingEntries(entries, terms) {
-  const distinct = new Map()
-  for (const entry of entries ?? []) {
-    const id = entry.skill?._id?.toString()
-    const key = id ?? normalizeSkill(entry.skill?.name ?? '')
-    if (key && !distinct.has(key) && skillTerms(entry.skill).some((term) => terms.has(term))) {
-      distinct.set(key, entry)
-    }
+function scoreDirection(teacherEntries, learnerEntries, returnedSide) {
+  const teachers = uniqueEntries(teacherEntries)
+  const learners = uniqueEntries(learnerEntries)
+  const entries = [...teachers, ...learners]
+  const parent = entries.map((_entry, index) => index)
+  const find = (index) => {
+    if (parent[index] !== index) parent[index] = find(parent[index])
+    return parent[index]
   }
-  return [...distinct.values()]
+  const union = (left, right) => {
+    const leftRoot = find(left)
+    const rightRoot = find(right)
+    if (leftRoot !== rightRoot) parent[rightRoot] = leftRoot
+  }
+  const termOwners = new Map()
+  entries.forEach((entry, index) => {
+    const skill = getSkill(entry)
+    for (const term of skillTerms(skill)) {
+      const previousOwner = termOwners.get(term)
+      if (previousOwner !== undefined) union(index, previousOwner)
+      else termOwners.set(term, index)
+    }
+  })
+
+  const matchesByLogicalSkill = new Map()
+  teachers.forEach((teacher, teacherIndex) => {
+    const teacherSkill = getSkill(teacher)
+    const teacherTerms = new Set(skillTerms(teacherSkill))
+    const teacherLevel = proficiencyValue(teacher)
+    learners.forEach((learner, learnerIndex) => {
+      const learnerSkill = getSkill(learner)
+      const sharedTerms = skillTerms(learnerSkill).filter((term) => teacherTerms.has(term))
+      if (!sharedTerms.length) return
+
+      const logicalSkill = find(teacherIndex)
+      const exact = skillName(teacherSkill) === skillName(learnerSkill)
+      const learnerLevel = proficiencyValue(learner)
+      const compatible = teacherLevel !== undefined
+        && learnerLevel !== undefined
+        && teacherLevel >= learnerLevel
+      const pair = {
+        teacher,
+        learner,
+        exact,
+        compatible,
+        sharedTerm: [...sharedTerms].sort((left, right) => left.localeCompare(right, 'en'))[0],
+      }
+      const group = matchesByLogicalSkill.get(logicalSkill) ?? []
+      group.push(pair)
+      matchesByLogicalSkill.set(logicalSkill, group)
+    })
+  })
+
+  const matches = [...matchesByLogicalSkill.values()].map((pairs) => {
+    const sortedPairs = [...pairs].sort((left, right) => (
+      Number(right.exact) - Number(left.exact)
+      || (returnedSide === 'teacher' ? compareEntries(left.teacher, right.teacher) : compareEntries(left.learner, right.learner))
+      || left.sharedTerm.localeCompare(right.sharedTerm, 'en')
+    ))
+    const selectedPair = sortedPairs[0]
+    const resultEntry = returnedSide === 'teacher' ? selectedPair.teacher : selectedPair.learner
+    return {
+      entry: resultEntry,
+      exact: pairs.some((pair) => pair.exact),
+      compatible: selectedPair.compatible,
+      logicalKey: selectedPair.sharedTerm,
+    }
+  }).sort((left, right) => compareEntries(left.entry, right.entry) || left.logicalKey.localeCompare(right.logicalKey, 'en'))
+
+  const skillMatchPoints = Math.min(
+    SCORE_WEIGHTS.skillPointsPerDirectionCap,
+    matches.reduce((total, match) => total + (match.exact ? SCORE_WEIGHTS.exactSkill : SCORE_WEIGHTS.aliasSkill), 0),
+  )
+  const compatibleSkillCount = matches.filter((match) => match.compatible).length
+  const proficiencyBonus = Math.min(
+    SCORE_WEIGHTS.proficiencyPointsPerDirectionCap,
+    compatibleSkillCount * SCORE_WEIGHTS.compatibleProficiency,
+  )
+
+  return {
+    entries: matches.map(({ entry }) => entry),
+    skillMatchPoints,
+    compatibleSkillCount,
+    proficiencyBonus,
+  }
 }
 
 export function calculateMatchDetails(student, candidate) {
-  const wantedTerms = new Set((student.skillsToLearn ?? []).flatMap((entry) => skillTerms(entry.skill)))
-  const teachTerms = new Set((student.skillsToTeach ?? []).flatMap((entry) => skillTerms(entry.skill)))
-  const skillsTheyCanTeachMe = distinctMatchingEntries(candidate.skillsToTeach, wantedTerms)
-  const skillsICanTeachThem = distinctMatchingEntries(candidate.skillsToLearn, teachTerms)
-  const mutualMatchCount = skillsTheyCanTeachMe.length + skillsICanTeachThem.length
-  const mutual = skillsTheyCanTeachMe.length > 0 && skillsICanTeachThem.length > 0
-  const matchScore = (skillsTheyCanTeachMe.length ? 40 : 0)
-    + (skillsICanTeachThem.length ? 40 : 0)
-    + (hasCompatibleProficiency(candidate.skillsToTeach ?? [], student.skillsToLearn ?? []) ? 5 : 0)
-    + (hasCompatibleProficiency(student.skillsToTeach ?? [], candidate.skillsToLearn ?? []) ? 5 : 0)
-    + (mutual ? 10 : 0)
+  const theyCanTeachMe = scoreDirection(
+    candidate.skillsToTeach,
+    student.skillsToLearn,
+    'teacher',
+  )
+  const iCanTeachThem = scoreDirection(
+    student.skillsToTeach,
+    candidate.skillsToLearn,
+    'learner',
+  )
+  const mutual = theyCanTeachMe.entries.length > 0 && iCanTeachThem.entries.length > 0
+  const mutualExchangeBonus = mutual ? SCORE_WEIGHTS.mutualExchange : 0
+  const mutualMatchCount = theyCanTeachMe.entries.length + iCanTeachThem.entries.length
   const matchReasons = []
-  if (skillsTheyCanTeachMe.length) {
-    matchReasons.push(`Can teach you ${skillsTheyCanTeachMe.map((entry) => entry.skill.name).join(', ')}.`)
-  }
-  if (skillsICanTeachThem.length) {
-    matchReasons.push(`Wants to learn ${skillsICanTeachThem.map((entry) => entry.skill.name).join(', ')}.`)
-  }
-  if (hasCompatibleProficiency(candidate.skillsToTeach ?? [], student.skillsToLearn ?? [])
-    || hasCompatibleProficiency(student.skillsToTeach ?? [], candidate.skillsToLearn ?? [])) {
-    matchReasons.push('Listed proficiency levels are compatible for at least one matched skill.')
-  }
-  if (mutual) matchReasons.push('Your skills create a complementary exchange.')
 
-  return { skillsTheyCanTeachMe, skillsICanTeachThem, mutualMatchCount, matchScore, matchReasons }
+  if (theyCanTeachMe.entries.length) {
+    matchReasons.push(`Can teach you ${theyCanTeachMe.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`)
+  }
+  if (iCanTeachThem.entries.length) {
+    matchReasons.push(`Wants to learn ${iCanTeachThem.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`)
+  }
+  const compatibleCount = [
+    theyCanTeachMe,
+    iCanTeachThem,
+  ].reduce((total, direction) => total + direction.compatibleSkillCount, 0)
+  if (compatibleCount) {
+    matchReasons.push(`Proficiency levels are compatible for ${compatibleCount} matched skill${compatibleCount === 1 ? '' : 's'}.`)
+  }
+  if (mutual) {
+    matchReasons.push('Mutual exchange: both students can teach skills the other wants to learn.')
+  }
+
+  const matchScore = theyCanTeachMe.skillMatchPoints
+    + iCanTeachThem.skillMatchPoints
+    + theyCanTeachMe.proficiencyBonus
+    + iCanTeachThem.proficiencyBonus
+    + mutualExchangeBonus
+
+  return {
+    skillsTheyCanTeachMe: theyCanTeachMe.entries,
+    skillsICanTeachThem: iCanTeachThem.entries,
+    mutualMatchCount,
+    matchScore: Math.max(0, Math.min(100, Math.trunc(matchScore))),
+    matchReasons,
+    scoreComponents: {
+      skillMatchPoints: {
+        theyCanTeachMe: theyCanTeachMe.skillMatchPoints,
+        iCanTeachThem: iCanTeachThem.skillMatchPoints,
+      },
+      proficiencyBonus: {
+        theyCanTeachMe: theyCanTeachMe.proficiencyBonus,
+        iCanTeachThem: iCanTeachThem.proficiencyBonus,
+      },
+      mutualExchangeBonus,
+    },
+  }
 }
 
 function escapeRegex(value) {
-  const specialCharacters = new Set('.*+?^${}()|[]'.split('').concat(String.fromCodePoint(92)))
   const escapeCharacter = String.fromCodePoint(92)
+  const specialCharacters = new Set('.*+?^${}()|[]'.split('').concat(escapeCharacter))
   return [...value].map((character) => (
     specialCharacters.has(character) ? `${escapeCharacter}${character}` : character
   )).join('')
-}
-
-function termsForEntries(entries) {
-  return [...new Set((entries ?? []).flatMap((entry) => skillTerms(entry.skill)))]
-}
-
-function levelExpression(variable) {
-  return {
-    $cond: [
-      { $eq: [variable, 'BEGINNER'] },
-      0,
-      {
-        $cond: [
-          { $eq: [variable, 'INTERMEDIATE'] },
-          1,
-          {
-            $cond: [
-              { $eq: [variable, 'ADVANCED'] },
-              2,
-              { $cond: [{ $eq: [variable, 'EXPERT'] }, 3, -1] },
-            ],
-          },
-        ],
-      },
-    ],
-  }
 }
 
 function objectId(value) {
@@ -133,24 +250,36 @@ function proficiencyFilter(filters) {
   return conditions.length === 1 ? conditions[0] : { $or: conditions }
 }
 
+async function skillIdsForTerms(terms) {
+  const normalizedTerms = [...new Set(terms.filter(Boolean))]
+  if (!normalizedTerms.length) return []
+  const skills = await Skill.find({
+    $or: [
+      { normalizedName: { $in: normalizedTerms } },
+      { aliases: { $in: normalizedTerms } },
+    ],
+  }).select('_id').lean()
+  return skills.map(({ _id }) => _id)
+}
+
 async function skillSearchCondition(query) {
   const expression = new RegExp(escapeRegex(query), 'i')
-  const searchConditions = [{ name: expression }]
   const matchingSkills = await Skill.find({
     status: 'ACTIVE',
     $or: [{ name: expression }, { aliases: expression }],
   }).select('_id').lean()
+  const conditions = [{ name: expression }]
   if (matchingSkills.length) {
     const ids = matchingSkills.map(({ _id }) => _id)
-    searchConditions.push(
+    conditions.push(
       { 'skillsToTeach.skill': { $in: ids } },
       { 'skillsToLearn.skill': { $in: ids } },
     )
   }
-  return { $or: searchConditions }
+  return { $or: conditions }
 }
 
-async function buildDiscoveryMatch(student, filters) {
+async function buildDiscoveryMatch(student, filters, recommendationsOnly) {
   const conditions = []
   if (filters.teachingSkill) {
     conditions.push({ 'skillsToTeach.skill': objectId(filters.teachingSkill) })
@@ -163,6 +292,19 @@ async function buildDiscoveryMatch(student, filters) {
     conditions.push({ college: { $regex: escapeRegex(filters.college), $options: 'i' } })
   }
   if (filters.q) conditions.push(await skillSearchCondition(filters.q))
+
+  if (recommendationsOnly) {
+    const [teachMeIds, teachThemIds] = await Promise.all([
+      skillIdsForTerms((student.skillsToLearn ?? []).flatMap((entry) => skillTerms(getSkill(entry)))),
+      skillIdsForTerms((student.skillsToTeach ?? []).flatMap((entry) => skillTerms(getSkill(entry)))),
+    ])
+    const complementarySkills = []
+    if (teachMeIds.length) complementarySkills.push({ 'skillsToTeach.skill': { $in: teachMeIds } })
+    if (teachThemIds.length) complementarySkills.push({ 'skillsToLearn.skill': { $in: teachThemIds } })
+    if (!complementarySkills.length) return null
+    conditions.push({ $or: complementarySkills })
+  }
+
   return {
     role: 'STUDENT',
     _id: { $ne: objectId(student._id) },
@@ -170,221 +312,69 @@ async function buildDiscoveryMatch(student, filters) {
   }
 }
 
-function scoreStages(learnEntries, teachEntries) {
-  const learnTerms = [...new Set(learnEntries.flatMap((entry) => entry.terms))]
-  const teachTerms = [...new Set(teachEntries.flatMap((entry) => entry.terms))]
-  const keysExpression = (variable) => ({
-    $concatArrays: [
-      [`$$${variable}.normalizedName`],
-      { $ifNull: [`$$${variable}.aliases`, []] },
-    ],
+function compareCandidates(left, right) {
+  return right.matchScore - left.matchScore
+    || left.name.localeCompare(right.name, 'en', { sensitivity: 'base' })
+    || left.id.localeCompare(right.id, 'en')
+}
+
+function paginationResult(students, page, limit) {
+  const total = students.length
+  const start = (page - 1) * limit
+  return {
+    students: students.slice(start, start + limit),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  }
+}
+
+function publicSkillEntries(entries = []) {
+  return entries.flatMap((entry) => {
+    const skill = getSkill(entry)
+    if (!skill) return []
+    return [{
+      skill: {
+        _id: skill._id,
+        name: skill.name,
+        category: skill.category,
+        aliases: skill.aliases ?? [],
+      },
+      proficiency: entry.proficiency,
+    }]
   })
-  const matchingCount = (docs, terms) => ({
-    $size: {
-      $filter: {
-        input: `$${docs}`,
-        as: 'skill',
-        cond: {
-          $gt: [
-            { $size: { $setIntersection: [keysExpression('skill'), terms] } },
-            0,
-          ],
-        },
-      },
-    },
-  })
-  const matchedByProficiency = (candidateSkills, learnerEntries) => ({
-    $size: {
-      $filter: {
-        input: candidateSkills,
-        as: 'candidateSkill',
-        cond: {
-          $and: [
-            { $gt: [{ $size: { $setIntersection: ['$$candidateSkill.terms', learnerEntries.length ? learnerEntries.flatMap((entry) => entry.terms) : []] } }, 0] },
-            {
-              $anyElementTrue: [{
-                $map: {
-                  input: learnerEntries,
-                  as: 'learner',
-                  in: {
-                    $and: [
-                      { $gt: [{ $size: { $setIntersection: ['$$candidateSkill.terms', '$$learner.terms'] } }, 0] },
-                      { $gte: ['$$candidateSkill.level', '$$learner.level'] },
-                    ],
-                  },
-                },
-              }],
-            },
-          ],
-        },
-      },
-    },
-  })
-  const candidateSkillDetails = (docs, entriesPath) => ({
-    $map: {
-      input: `$${docs}`,
-      as: 'skill',
-      in: {
-        terms: keysExpression('skill'),
-        level: {
-          $let: {
-            vars: {
-              entry: {
-                $arrayElemAt: [
-                  {
-                    $filter: {
-                      input: `$${entriesPath}`,
-                      as: 'entry',
-                      cond: { $eq: ['$$entry.skill', '$$skill._id'] },
-                    },
-                  },
-                  0,
-                ],
-              },
-            },
-            in: levelExpression('$$entry.proficiency'),
-          },
-        },
-      },
-    },
-  })
-  return [
-    {
-      $lookup: {
-        from: Skill.collection.name,
-        localField: 'skillsToTeach.skill',
-        foreignField: '_id',
-        as: '_teachDocs',
-      },
-    },
-    {
-      $lookup: {
-        from: Skill.collection.name,
-        localField: 'skillsToLearn.skill',
-        foreignField: '_id',
-        as: '_learnDocs',
-      },
-    },
-    {
-      $addFields: {
-        _candidateTeachSkills: candidateSkillDetails('_teachDocs', 'skillsToTeach'),
-        _candidateLearnSkills: candidateSkillDetails('_learnDocs', 'skillsToLearn'),
-        _teachMeCount: matchingCount('_teachDocs', learnTerms),
-        _teachThemCount: matchingCount('_learnDocs', teachTerms),
-      },
-    },
-    {
-      $addFields: {
-        _teachMeCompatibleCount: matchedByProficiency('$_candidateTeachSkills', learnEntries),
-        _teachThemCompatibleCount: matchedByProficiency('$_candidateLearnSkills', teachEntries),
-      },
-    },
-    {
-      $addFields: {
-        mutualMatchCount: { $add: ['$_teachMeCount', '$_teachThemCount'] },
-        matchScore: {
-          $add: [
-            { $cond: [{ $gt: ['$_teachMeCount', 0] }, 40, 0] },
-            { $cond: [{ $gt: ['$_teachThemCount', 0] }, 40, 0] },
-            { $cond: [{ $gt: ['$_teachMeCompatibleCount', 0] }, 5, 0] },
-            { $cond: [{ $gt: ['$_teachThemCompatibleCount', 0] }, 5, 0] },
-            {
-              $cond: [
-                { $and: [{ $gt: ['$_teachMeCount', 0] }, { $gt: ['$_teachThemCount', 0] }] },
-                10,
-                0,
-              ],
-            },
-          ],
-        },
-      },
-    },
-  ]
 }
 
 export async function discoverStudents(student, filters, recommendationsOnly = false) {
-  const learnEntries = proficiencyEntries(student.skillsToLearn)
-  const teachEntries = proficiencyEntries(student.skillsToTeach)
-  const learnTerms = termsForEntries(student.skillsToLearn)
-  const teachTerms = termsForEntries(student.skillsToTeach)
-  const match = await buildDiscoveryMatch(student, filters)
+  const match = await buildDiscoveryMatch(student, filters, recommendationsOnly)
+  if (!match) return paginationResult([], filters.page, filters.limit)
 
-  const pipeline = [
-    { $match: match },
-    ...scoreStages(learnEntries, teachEntries),
-    ...(recommendationsOnly ? [{ $match: { matchScore: { $gt: 0 } } }] : []),
-    { $sort: { matchScore: -1, name: 1, _id: 1 } },
-    {
-      $facet: {
-        results: [
-          { $skip: (filters.page - 1) * filters.limit },
-          { $limit: filters.limit },
-          {
-            $project: {
-              name: 1,
-              profileImage: 1,
-              bio: 1,
-              college: 1,
-              skillsToTeach: 1,
-              skillsToLearn: 1,
-              matchScore: 1,
-              mutualMatchCount: 1,
-              _teachDocs: 1,
-              _learnDocs: 1,
-              _teachMeCount: 1,
-              _teachThemCount: 1,
-              _teachMeCompatibleCount: 1,
-              _teachThemCompatibleCount: 1,
-            },
-          },
-        ],
-        total: [{ $count: 'count' }],
-      },
-    },
-  ]
-  const [result] = await User.aggregate(pipeline)
-  const total = result.total[0]?.count ?? 0
-  const users = result.results.map((candidate) => {
-    const teachDocs = new Map(candidate._teachDocs.map((skill) => [skill._id.toString(), skill]))
-    const learnDocs = new Map(candidate._learnDocs.map((skill) => [skill._id.toString(), skill]))
-    const safeSkills = (entries, docs) => (entries ?? []).flatMap((entry) => {
-      const skill = docs.get(entry.skill.toString())
-      return skill ? [{ skill: { _id: skill._id, name: skill.name, category: skill.category, aliases: skill.aliases }, proficiency: entry.proficiency }] : []
+  const candidates = await User.find(match)
+    .select('_id name profileImage bio college skillsToTeach skillsToLearn')
+    .populate('skillsToTeach.skill', 'name normalizedName aliases category')
+    .populate('skillsToLearn.skill', 'name normalizedName aliases category')
+    .lean()
+
+  const rankedStudents = candidates
+    .map((candidate) => {
+      const details = calculateMatchDetails(student, candidate)
+      if (recommendationsOnly && details.matchScore === 0) return null
+      return {
+        id: candidate._id.toString(),
+        name: candidate.name,
+        profileImage: candidate.profileImage,
+        bio: candidate.bio,
+        college: candidate.college,
+        skillsToTeach: publicSkillEntries(candidate.skillsToTeach),
+        skillsToLearn: publicSkillEntries(candidate.skillsToLearn),
+        skillsTheyCanTeachMe: publicSkillEntries(details.skillsTheyCanTeachMe),
+        skillsICanTeachThem: publicSkillEntries(details.skillsICanTeachThem),
+        mutualMatchCount: details.mutualMatchCount,
+        matchScore: details.matchScore,
+        matchReasons: details.matchReasons,
+        scoreComponents: details.scoreComponents,
+      }
     })
-    const safeCandidate = {
-      id: candidate._id.toString(),
-      name: candidate.name,
-      profileImage: candidate.profileImage,
-      bio: candidate.bio,
-      college: candidate.college,
-      skillsToTeach: safeSkills(candidate.skillsToTeach, teachDocs),
-      skillsToLearn: safeSkills(candidate.skillsToLearn, learnDocs),
-    }
-    const skillsTheyCanTeachMe = distinctMatchingEntries(safeCandidate.skillsToTeach, new Set(learnTerms))
-    const skillsICanTeachThem = distinctMatchingEntries(safeCandidate.skillsToLearn, new Set(teachTerms))
-    const mutual = skillsTheyCanTeachMe.length > 0 && skillsICanTeachThem.length > 0
-    const compatible = candidate._teachMeCompatibleCount > 0 || candidate._teachThemCompatibleCount > 0
-    const matchReasons = []
-    if (skillsTheyCanTeachMe.length) matchReasons.push(`Can teach you ${skillsTheyCanTeachMe.map((entry) => entry.skill.name).join(', ')}.`)
-    if (skillsICanTeachThem.length) matchReasons.push(`Wants to learn ${skillsICanTeachThem.map((entry) => entry.skill.name).join(', ')}.`)
-    if (compatible) matchReasons.push('Listed proficiency levels are compatible for at least one matched skill.')
-    if (mutual) matchReasons.push('Your skills create a complementary exchange.')
-    return {
-      ...safeCandidate,
-      skillsTheyCanTeachMe,
-      skillsICanTeachThem,
-      mutualMatchCount: skillsTheyCanTeachMe.length + skillsICanTeachThem.length,
-      matchScore: candidate.matchScore,
-      matchReasons,
-    }
-  })
-  return {
-    students: users,
-    pagination: {
-      page: filters.page,
-      limit: filters.limit,
-      total,
-      pages: Math.ceil(total / filters.limit),
-    },
-  }
+    .filter(Boolean)
+    .sort(compareCandidates)
+
+  return paginationResult(rankedStudents, filters.page, filters.limit)
 }

@@ -33,6 +33,7 @@ export function Header({ compact = false }) {
         <NavLink to="/discover">Discover</NavLink>
         <NavLink to="/requests/sent">Sent requests</NavLink>
         <NavLink to="/requests/received">Received requests</NavLink>
+        <NavLink to="/sessions">Sessions</NavLink>
         <NavLink to="/profile">My profile</NavLink>
       </nav>}
       <div className="account-actions">

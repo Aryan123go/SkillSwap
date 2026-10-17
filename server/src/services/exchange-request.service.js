@@ -129,6 +129,27 @@ export async function listExchangeRequests(user, direction, query) {
   return { requests, pagination: { page: query.page, limit: query.limit, total, pages: Math.ceil(total / query.limit) } }
 }
 
+export async function listAcceptedExchangeRequests(user, query) {
+  requireStudent(user)
+  const filter = {
+    status: 'ACCEPTED',
+    $or: [{ sender: user._id }, { recipient: user._id }],
+  }
+  const [requests, total] = await Promise.all([
+    ExchangeRequest.find(filter)
+      .sort({ updatedAt: -1, _id: -1 })
+      .skip((query.page - 1) * query.limit)
+      .limit(query.limit)
+      .populate(requestPopulate)
+      .lean(),
+    ExchangeRequest.countDocuments(filter),
+  ])
+  return {
+    requests,
+    pagination: { page: query.page, limit: query.limit, total, pages: Math.ceil(total / query.limit) },
+  }
+}
+
 export async function getExchangeRequest(user, id) {
   requireStudent(user)
   const request = await ExchangeRequest.findById(id).populate(requestPopulate).lean()

@@ -4,6 +4,7 @@ import {
   changeExchangeRequestStatus,
   createExchangeRequest as createRequest,
   getExchangeRequest as findRequest,
+  listAcceptedExchangeRequests,
   listExchangeRequests,
 } from '../services/exchange-request.service.js'
 import { requestListQuerySchema } from '../validators/exchange-request.validator.js'
@@ -29,6 +30,16 @@ export function getSentRequests(request, response) {
 
 export function getReceivedRequests(request, response) {
   return listRequests(request, response, 'received')
+}
+
+export async function getAcceptedRequests(request, response) {
+  const parsed = requestListQuerySchema.safeParse(request.query)
+  if (!parsed.success) {
+    throw new HttpError(400, parsed.error.issues[0]?.message ?? 'Invalid pagination parameters.', 'VALIDATION_ERROR')
+  }
+  const query = { page: Number(parsed.data.page), limit: Number(parsed.data.limit) }
+  const result = await listAcceptedExchangeRequests(request.user, query)
+  response.json({ success: true, data: result })
 }
 
 export async function getRequest(request, response) {

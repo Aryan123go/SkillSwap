@@ -433,6 +433,9 @@ test('protected discovery, request, and session endpoints reject unauthenticated
       '/exchange-requests/accepted',
       '/sessions',
       '/sessions/0123456789abcdef01234567',
+      '/conversations',
+      '/conversations/0123456789abcdef01234567',
+      '/conversations/0123456789abcdef01234567/messages',
     ]) {
       const response = await fetch(`${root}${path}`)
       assert.equal(response.status, 401, `${path} should require a session`)

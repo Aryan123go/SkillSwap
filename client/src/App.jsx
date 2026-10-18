@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './AuthContext.jsx'
@@ -15,6 +16,7 @@ import {
 import { DiscoveryPage } from './DiscoveryPage.jsx'
 import { RequestsPage } from './RequestsPage.jsx'
 import { SessionDetailPage, SessionsPage } from './SessionsPage.jsx'
+import { ConversationPage, MessagesPage } from './ChatPage.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -38,6 +40,8 @@ function ApplicationRoutes() {
     <Route path="/requests/received" element={<ProtectedRoute><RequestsPage direction="received" /></ProtectedRoute>} />
     <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
     <Route path="/sessions/:id" element={<ProtectedRoute><SessionDetailPage /></ProtectedRoute>} />
+    <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+    <Route path="/messages/:conversationId" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
     <Route path="/profile" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />
     <Route path="/profile/edit" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
     <Route path="/profile/:id" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />

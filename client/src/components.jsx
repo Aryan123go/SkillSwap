@@ -34,6 +34,7 @@ export function Header({ compact = false }) {
         <NavLink to="/requests/sent">Sent requests</NavLink>
         <NavLink to="/requests/received">Received requests</NavLink>
         <NavLink to="/sessions">Sessions</NavLink>
+        <NavLink to="/messages">Messages</NavLink>
         <NavLink to="/profile">My profile</NavLink>
       </nav>}
       <div className="account-actions">

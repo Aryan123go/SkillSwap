@@ -33,7 +33,7 @@ The API connects to MongoDB and initializes the skill catalogue before listening
 - One canonical JavaScript match scorer is used for discovery and recommendations. Per direction, distinct exact skill matches award 10 points each and alias-only matches award 7 each, capped at 30 skill points. Each distinct match with a known teacher proficiency equal to or above the learner's earns 5 points, capped at 10 proficiency points per direction. Matching in both directions earns a 20-point mutual-exchange bonus. The integer score ranges from 0 to 100 and is a ranking indicator, not a probability.
 - Exchange requests can be sent for a student's learning interests, with an optional offered skill and introductory message. Recipients can accept or reject pending requests; senders can cancel pending requests. Decisions are atomic, and only the two participants can view a request.
 - Either student in an accepted exchange can propose a session. The other participant can confirm or decline; either participant can cancel or propose a reschedule. Rescheduling returns the session to `PROPOSED`, requiring the other participant to confirm the new time.
-- Chat, external calendars, video calls, reviews, notifications, AI services, and payment features are not part of this release.
+- Private real-time text chat between participants of accepted exchange requests, with MongoDB-persisted messages and REST history fallback. File uploads, group chat, video calls, reviews, notifications, AI services, and payment features are not included.
 
 ## API
 
@@ -58,6 +58,11 @@ The API connects to MongoDB and initializes the skill catalogue before listening
 - `POST /api/sessions` (authenticated participant; propose for an accepted request)
 - `GET /api/sessions` (authenticated participant; optional `status`, `period=upcoming|past`, `page`, `limit`)
 - `GET /api/sessions/:id` (authenticated participant only)
+- `GET /api/conversations` (authenticated; conversations for accepted exchanges)
+- `GET /api/conversations/by-request/:requestId` (authenticated participant in an accepted exchange)
+- `GET /api/conversations/:id` (authenticated participant only)
+- `GET /api/conversations/:id/messages?page=1&limit=50` (authenticated participant only; limit max 100)
+- `POST /api/conversations/:id/messages` (authenticated participant only; `content` required, max 2,000 characters)
 - `PATCH /api/sessions/:id/confirm` (other participant; proposed only)
 - `PATCH /api/sessions/:id/decline` (other participant; proposed only)
 - `PATCH /api/sessions/:id/cancel` (either participant; proposed or confirmed)

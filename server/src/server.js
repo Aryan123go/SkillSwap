@@ -1,5 +1,7 @@
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
+import { createServer } from 'node:http'
+import { attachChatSocket } from './sockets/chat.socket.js'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createApp } from './app.js'
@@ -27,7 +29,9 @@ async function start() {
 
   const port = Number(process.env.PORT || 5000)
   const app = createApp()
-  httpServer = app.listen(port, () => console.info(`SkillSwap API listening on port ${port}.`))
+  httpServer = createServer(app)
+  attachChatSocket(httpServer)
+  httpServer.listen(port, () => console.info(`SkillSwap API and chat socket listening on port ${port}.`))
 }
 
 async function shutdown(signal) {

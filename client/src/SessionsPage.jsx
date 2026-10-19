@@ -14,15 +14,21 @@ function AppLayout({ children }) {
 }
 
 function formatLocalTime(value) {
+  const date = new Date(value)
+  if (!value || Number.isNaN(date.getTime())) return 'Time unavailable'
   return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
     timeZoneName: 'short',
-  }).format(new Date(value))
+  }).format(date)
 }
 
 function toLocalInput(value) {
   const date = new Date(value)
+  if (!value || Number.isNaN(date.getTime())) return ''
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 
@@ -38,11 +44,11 @@ function participantId(participant) {
 
 function SessionCard({ session, userId }) {
   const organizerId = participantId(session.organizer)?.toString()
-  const otherParticipant = session.participants.find((participant) => participantId(participant)?.toString() !== userId)
+  const otherParticipant = (Array.isArray(session.participants) ? session.participants : []).find((participant) => participantId(participant)?.toString() !== userId)
   return <article className="session-card">
     <div className="session-card-heading">
       <div><span className="section-kicker">{organizerId === userId ? 'YOU PROPOSED' : 'SESSION WITH'}</span><h2><Link to={`/sessions/${session._id}`}>{session.title}</Link></h2></div>
-      <span className={`request-status status-${session.status.toLowerCase()}`}>{session.status.toLowerCase()}</span>
+      <span className={`request-status status-${String(session.status ?? 'unknown').toLowerCase()}`}>{String(session.status ?? 'unknown').toLowerCase()}</span>
     </div>
     <p className="session-partner">{otherParticipant
       ? <Link to={`/profile/${participantId(otherParticipant)}`}>{otherParticipant.name}</Link>
@@ -88,10 +94,10 @@ export function SessionsPage() {
     ])
       .then(([upcomingData, pastData, requestData]) => {
         if (!active) return
-        setUpcoming(upcomingData.sessions)
-        setPast(pastData.sessions)
-        setAcceptedRequests(requestData.requests)
-        setAcceptedPagination(requestData.pagination)
+        setUpcoming(Array.isArray(upcomingData.sessions) ? upcomingData.sessions : [])
+        setPast(Array.isArray(pastData.sessions) ? pastData.sessions : [])
+        setAcceptedRequests(Array.isArray(requestData.requests) ? requestData.requests : [])
+        setAcceptedPagination(requestData.pagination ?? { page: 1, pages: 0 })
       })
       .catch((requestError) => { if (active) setError(requestError.message) })
       .finally(() => { if (active) setLoading(false) })
@@ -322,14 +328,14 @@ export function SessionDetailPage() {
     {!isLoading && error && <section className="empty-panel error-panel" role="alert"><p>{error}</p><Link className="secondary-button" to="/sessions">Back to sessions</Link></section>}
     {!isLoading && !error && session && <>
       <section className="content-card session-detail-card">
-        <div className="session-card-heading"><div><span className="section-kicker">CURRENT STATUS</span><h2>{session.title}</h2></div><span className={`request-status status-${session.status.toLowerCase()}`}>{session.status.toLowerCase()}</span></div>
+        <div className="session-card-heading"><div><span className="section-kicker">CURRENT STATUS</span><h2>{session.title}</h2></div><span className={`request-status status-${String(session.status ?? 'unknown').toLowerCase()}`}>{String(session.status ?? 'unknown').toLowerCase()}</span></div>
         <p className="session-time"><strong>{formatLocalTime(session.startAt)}</strong> – {formatLocalTime(session.endAt)}</p>
         <p className="form-hint">Start and end times are converted to the viewer's local timezone ({timeZone}).</p>
         {session.description && <p className="session-description">{session.description}</p>}
-        <div className="session-participants"><span className="section-kicker">PARTICIPANTS</span><div>{participants.map((participant) => <Link key={participantId(participant)} to={`/profile/${participantId(participant)}`}>{participant.name}</Link>)}</div></div>
+        <div className="session-participants"><span className="section-kicker">PARTICIPANTS</span><div>{(Array.isArray(participants) ? participants : []).filter(Boolean).map((participant) => <Link key={participantId(participant)} to={`/profile/${participantId(participant)}`}>{participant.name ?? 'SkillSwap student'}</Link>)}</div></div>
         {request && <div className="session-related-request"><span className="section-kicker">RELATED EXCHANGE REQUEST</span><p>{request.requestedSkill?.name ? `Learning ${request.requestedSkill.name}` : 'Accepted skill exchange'}{request.offeredSkill?.name ? ` · offering ${request.offeredSkill.name}` : ''}</p><Link className="secondary-button" to={`/requests/${requestOwner}`}>View exchange requests</Link></div>}
       </section>
-      <SessionActions session={session} userId={user.id} onUpdated={() => {
+      <SessionActions key={`${session._id}:${session.updatedAt ?? ''}`} session={session} userId={user.id} onUpdated={() => {
         setLoading(true)
         setRefreshKey((value) => value + 1)
       }} />

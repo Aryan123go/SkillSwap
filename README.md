@@ -33,7 +33,9 @@ The API connects to MongoDB and initializes the skill catalogue before listening
 - One canonical JavaScript match scorer is used for discovery and recommendations. Per direction, distinct exact skill matches award 10 points each and alias-only matches award 7 each, capped at 30 skill points. Each distinct match with a known teacher proficiency equal to or above the learner's earns 5 points, capped at 10 proficiency points per direction. Matching in both directions earns a 20-point mutual-exchange bonus. The integer score ranges from 0 to 100 and is a ranking indicator, not a probability.
 - Exchange requests can be sent for a student's learning interests, with an optional offered skill and introductory message. Recipients can accept or reject pending requests; senders can cancel pending requests. Decisions are atomic, and only the two participants can view a request.
 - Either student in an accepted exchange can propose a session. The other participant can confirm or decline; either participant can cancel or propose a reschedule. Rescheduling returns the session to `PROPOSED`, requiring the other participant to confirm the new time.
-- Private real-time text chat between participants of accepted exchange requests, with MongoDB-persisted messages and REST history fallback. File uploads, group chat, video calls, reviews, notifications, AI services, and payment features are not included.
+- Private real-time text chat between participants of accepted exchange requests, with MongoDB-persisted messages and REST history fallback.
+- Completed sessions support one 1–5 star review from each participant. Profile reputation is calculated from eligible reviews, and written feedback is optional.
+- File uploads, group chat, video calls, notifications, AI services, and payment features are not included.
 
 ## API
 
@@ -68,6 +70,9 @@ The API connects to MongoDB and initializes the skill catalogue before listening
 - `PATCH /api/sessions/:id/cancel` (either participant; proposed or confirmed)
 - `PATCH /api/sessions/:id/reschedule` (either participant; proposed or confirmed; requires new `startAt` and `endAt`)
 - `PATCH /api/sessions/:id/complete` (either participant; confirmed and after the scheduled end)
+- `GET /api/reviews/eligible` (authenticated student; completed sessions not yet reviewed)
+- `POST /api/reviews` (authenticated participant; completed session, integer rating 1–5, optional comment up to 500 characters)
+- `GET /api/reviews/user/:userId` (authenticated; reputation summary and up to 50 recent eligible reviews)
 
 Discovery responses contain only public profile fields and safe skill records. Match results include score components, distinct matched skills, and explanations based on the actual matches. Request bodies accept `recipient`, `requestedSkill`, optional `offeredSkill`, and optional `message`; clients cannot set status or sender identity, and recipient selection is checked against the authenticated student. Session organizer and participants are derived from the accepted request and authenticated user; clients cannot provide participant IDs.
 
@@ -90,6 +95,8 @@ Permitted session transitions:
 | `DECLINED`, `CANCELLED`, `COMPLETED` | — | terminal | No reopening |
 
 Status updates use conditional MongoDB updates. Confirm/decline and terminal transitions require the expected current status. Rescheduling compares an internal revision counter so competing schedule proposals cannot silently overwrite one another.
+
+`Review` records identify their session, authenticated reviewer, other session participant, integer rating, and optional feedback. A unique `(session, reviewer)` index prevents concurrent duplicate submissions. Reputation is calculated from reviews tied to existing completed sessions with two valid participants; stored or malformed ratings and reviews unrelated to the session participants are excluded.
 
 ### Matching formula and alias resolution
 
@@ -120,3 +127,13 @@ See `client/.env.example` and `server/.env.example` for variable names and examp
 - The scheduling workflow does not check calendar availability or provide video conferencing.
 - Matching uses existing skill names, explicit aliases, and proficiency values; it does not use paid AI, popularity, or unrelated skills.
 - Backend tests cover scoring, validation, session model constraints, and unauthenticated API access. Database-backed exchange/session lifecycle scenarios should also be verified against a configured MongoDB test database before production use.
+
+
+## Phase 6 updates
+
+Phase 6 improves session-page resilience and chat unread-message handling. See [`PHASE6_CHANGELOG.md`](./PHASE6_CHANGELOG.md) for the changed files, API behavior, and verification steps.
+
+
+## Reviews & reputation (Phase 6)
+
+After a session is marked `COMPLETED`, each participant can leave the other participant one 1–5 star rating and optional written feedback. Student profiles show the average rating, number of reviews, and recent feedback. Reviews are available from the **Reviews** navigation page. Only completed-session participants may review each other; duplicate reviews for a session are rejected.

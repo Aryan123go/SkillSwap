@@ -14,6 +14,10 @@ const conversationSchema = new mongoose.Schema({
   lastMessageAt: { type: Date, default: null },
   lastMessageText: { type: String, maxlength: 500, default: '' },
   lastMessageSender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  readBy: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    lastReadAt: { type: Date, required: true },
+  }],
 }, { timestamps: true })
 
 conversationSchema.index({ participants: 1, lastMessageAt: -1, updatedAt: -1 })

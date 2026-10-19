@@ -97,7 +97,37 @@ export async function listConversations(user) {
     .lean()
 
   // Never expose conversations whose related exchange is no longer accepted.
-  return conversations.filter((item) => item.exchangeRequest?.status === 'ACCEPTED')
+  const visible = conversations.filter((item) => item.exchangeRequest?.status === 'ACCEPTED')
+  const unreadCounts = await Promise.all(visible.map(async (conversation) => {
+    const readMarker = (conversation.readBy ?? []).find((entry) => (entry.user?._id ?? entry.user)?.toString() === user._id.toString())
+    const filter = { conversation: conversation._id, sender: { $ne: user._id } }
+    if (readMarker?.lastReadAt) filter.createdAt = { $gt: readMarker.lastReadAt }
+    const unreadCount = await Message.countDocuments(filter)
+    return [conversation._id.toString(), unreadCount]
+  }))
+  const countByConversation = new Map(unreadCounts)
+  return visible.map((conversation) => ({
+    ...conversation,
+    unreadCount: countByConversation.get(conversation._id.toString()) ?? 0,
+  }))
+}
+
+export async function markConversationRead(user, conversationId) {
+  const conversation = await getConversationForParticipant(user, conversationId)
+  const now = new Date()
+  const existing = (conversation.readBy ?? []).find((entry) => (entry.user?._id ?? entry.user)?.toString() === user._id.toString())
+  if (existing) {
+    await Conversation.updateOne(
+      { _id: conversation._id, 'readBy.user': user._id },
+      { $set: { 'readBy.$.lastReadAt': now } },
+    )
+  } else {
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      { $push: { readBy: { user: user._id, lastReadAt: now } } },
+    )
+  }
+  return { conversationId: conversation._id.toString(), lastReadAt: now }
 }
 
 export async function getConversation(user, conversationId) {

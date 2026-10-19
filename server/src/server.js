@@ -30,7 +30,8 @@ async function start() {
   const port = Number(process.env.PORT || 5000)
   const app = createApp()
   httpServer = createServer(app)
-  attachChatSocket(httpServer)
+  const chatIo = attachChatSocket(httpServer)
+  app.set('chatIo', chatIo)
   httpServer.listen(port, () => console.info(`SkillSwap API and chat socket listening on port ${port}.`))
 }
 

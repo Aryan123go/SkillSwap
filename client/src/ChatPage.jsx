@@ -47,24 +47,32 @@ export function MessagesPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
     apiRequest('/conversations')
-      .then(({ conversations: items }) => { if (active) setConversations(items) })
+      .then(({ conversations: items }) => { if (active) { setConversations(items); setError('') } })
       .catch((requestError) => { if (active) setError(requestError.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [refreshToken])
 
+  useEffect(() => {
+    const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
+    socket.on('user:message', () => {
+      setLoading(true)
+      setRefreshToken((value) => value + 1)
+    })
+    return () => socket.disconnect()
+  }, [])
+
   return <AppLayout>
-    <div className="page-heading"><div><span className="section-kicker">LEARN TOGETHER</span><h1>Your messages</h1><p>Private conversations for accepted skill exchanges.</p></div><button className="secondary-button" onClick={() => { setError(''); setRefreshToken((value) => value + 1) }}>Refresh</button></div>
+    <div className="page-heading"><div><span className="section-kicker">LEARN TOGETHER</span><h1>Your messages</h1><p>Private conversations for accepted skill exchanges.</p></div><button className="secondary-button" onClick={() => { setError(''); setLoading(true); setRefreshToken((value) => value + 1) }}>Refresh</button></div>
     {error && <div className="form-alert" role="alert">{error}</div>}
     {loading ? <div className="empty-panel">Loading conversations…</div> : conversations.length ? <section className="conversation-list">
       {conversations.map((conversation) => {
         const partner = partnerFor(conversation, user.id)
         return <Link className="conversation-row" to={`/messages/${conversation._id}`} key={conversation._id}>
           <span className="conversation-avatar">{initials(partner?.name)}</span>
-          <span className="conversation-summary"><strong>{partner?.name ?? 'SkillSwap student'}</strong><span>{conversation.lastMessageText || 'Start the conversation'}</span><small>{conversation.exchangeRequest?.requestedSkill?.name ? `Exchange: ${conversation.exchangeRequest.requestedSkill.name}` : 'Accepted exchange'}</small></span>
-          <time>{formatTime(conversation.lastMessageAt)}</time><ArrowIcon />
+          <span className="conversation-summary"><strong>{partner?.name ?? 'SkillSwap student'}</strong><span>{conversation.lastMessageSender && String(conversation.lastMessageSender._id ?? conversation.lastMessageSender) === String(user.id) ? 'You: ' : ''}{conversation.lastMessageText || 'Start the conversation'}</span><small>{conversation.exchangeRequest?.requestedSkill?.name ? `Exchange: ${conversation.exchangeRequest.requestedSkill.name}` : 'Accepted exchange'}</small></span>
+          <time>{formatTime(conversation.lastMessageAt)}</time>{Number(conversation.unreadCount) > 0 && <span className="conversation-unread-badge" aria-label={`${conversation.unreadCount} unread messages`}>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</span>}<ArrowIcon />
         </Link>
       })}
     </section> : <div className="empty-panel">No chats yet. Chat becomes available when a student accepts your exchange request. <p><Link to="/requests/received">View exchange requests</Link></p></div>}
@@ -79,6 +87,7 @@ export function ConversationPage() {
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadedConversationId, setLoadedConversationId] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [connection, setConnection] = useState('connecting')
@@ -94,8 +103,6 @@ export function ConversationPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError('')
     Promise.all([
       apiRequest(`/conversations/${conversationId}`),
       apiRequest(`/conversations/${conversationId}/messages?limit=50&page=1`),
@@ -103,14 +110,17 @@ export function ConversationPage() {
       if (!active) return
       setConversation(conversationData.conversation)
       setMessages(messageData.messages)
+      setError('')
+      setLoadedConversationId(conversationId)
+      apiRequest(`/conversations/${conversationId}/read`, { method: 'PATCH' }).catch(() => {})
     }).catch((requestError) => {
-      if (active) setError(requestError.message)
+      if (active) { setError(requestError.message); setConversation(null); setMessages([]); setLoadedConversationId(conversationId) }
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [conversationId])
 
   useEffect(() => {
-    if (loading || !conversation) return undefined
+    if (loading || loadedConversationId !== conversationId || !conversation) return undefined
     const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
     socketRef.current = socket
     socket.on('connect', () => {
@@ -120,7 +130,7 @@ export function ConversationPage() {
         else {
           // Fetch after joining to close the history/live-event race; IDs are deduplicated.
           apiRequest(`/conversations/${conversationId}/messages?limit=50&page=1`)
-            .then(({ messages: latest }) => latest.forEach(addMessage))
+            .then(({ messages: latest }) => { latest.forEach(addMessage); return apiRequest(`/conversations/${conversationId}/read`, { method: 'PATCH' }) })
             .catch((requestError) => setError(requestError.message))
         }
       })
@@ -130,13 +140,18 @@ export function ConversationPage() {
       setConnection('offline')
       setError(connectError.message || 'Chat connection failed. Refresh to try again.')
     })
-    socket.on('message:new', ({ message }) => addMessage(message))
+    socket.on('message:new', ({ message }) => {
+      addMessage(message)
+      if (String(message.sender?._id) !== String(user.id)) {
+        apiRequest(`/conversations/${conversationId}/read`, { method: 'PATCH' }).catch(() => {})
+      }
+    })
     return () => {
       socket.emit('conversation:leave', { conversationId })
       socket.disconnect()
       socketRef.current = null
     }
-  }, [conversationId, conversation, loading, addMessage])
+  }, [conversationId, conversation, loading, loadedConversationId, addMessage, user.id])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -177,7 +192,8 @@ export function ConversationPage() {
 
   const partner = conversation ? partnerFor(conversation, user.id) : null
 
-  if (loading) return <AppLayout><div className="empty-panel">Loading conversation…</div></AppLayout>
+  const isLoading = loading || loadedConversationId !== conversationId
+  if (isLoading) return <AppLayout><div className="empty-panel">Loading conversation…</div></AppLayout>
   if (error && !conversation) return <AppLayout><div className="empty-panel error-panel" role="alert">{error}<button className="secondary-button" onClick={() => navigate('/messages')}>Back to messages</button></div></AppLayout>
 
   return <AppLayout>

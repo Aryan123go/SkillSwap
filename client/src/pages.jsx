@@ -148,9 +148,12 @@ export function ProfilePage() {
   const { user } = useAuth()
   const { id } = useParams()
   const [publicProfile, setPublicProfile] = useState(null)
+  const [reviewResult, setReviewResult] = useState(null)
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0)
   const [error, setError] = useState('')
   const isOwnProfile = !id || id === user.id
   const profile = isOwnProfile ? user : publicProfile
+  const profileId = profile?._id ?? profile?.id
 
   useEffect(() => {
     if (!id || id === user.id) return undefined
@@ -159,21 +162,50 @@ export function ProfilePage() {
       .then(({ user: result }) => { if (active) setPublicProfile(result) })
       .catch((requestError) => { if (active) setError(requestError.message) })
     return () => { active = false }
-  }, [id, user])
+  }, [id, user.id])
+
+  useEffect(() => {
+    if (!profileId) return undefined
+    let active = true
+    apiRequest(`/reviews/user/${profileId}`)
+      .then((data) => { if (active) setReviewResult({ profileId, data, error: '' }) })
+      .catch((requestError) => { if (active) setReviewResult({ profileId, data: null, error: requestError.message }) })
+    return () => { active = false }
+  }, [profileId, reviewRefreshKey])
 
   if (error) return <AppLayout><div className="empty-panel" role="alert">{error}</div></AppLayout>
   if (!profile) return <AppLayout><div className="empty-panel">Loading profile…</div></AppLayout>
 
+  const reviewSummary = reviewResult?.profileId === profileId ? reviewResult.data : null
+  const reviewError = reviewResult?.profileId === profileId ? reviewResult.error : ''
   return <AppLayout>
     <div className="page-heading"><div><span className="section-kicker">STUDENT PROFILE</span><h1>{profile.name}</h1><p>{profile.college || 'Add your college to tell the community where you study.'}</p></div>{isOwnProfile && <Link className="primary-button" to="/profile/edit">Edit profile <ArrowIcon /></Link>}</div>
     <section className="profile-card">
       <div className="profile-avatar">{profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</div>
       <div className="profile-bio"><span className="section-kicker">A LITTLE ABOUT ME</span><p>{profile.bio || 'This profile is just getting started.'}</p></div>
     </section>
+    <section className="content-card reputation-card">
+      <div className="reputation-score"><span className="section-kicker">COMMUNITY REPUTATION</span><div className="reputation-number">{Number.isFinite(Number(reviewSummary?.reputation?.averageRating)) && reviewSummary?.reputation?.averageRating != null ? Number(reviewSummary.reputation.averageRating).toFixed(1) : '—'} <span aria-hidden="true">★</span></div><p>{Number.isSafeInteger(reviewSummary?.reputation?.reviewCount) ? reviewSummary.reputation.reviewCount : '—'} {reviewSummary?.reputation?.reviewCount === 1 ? 'review' : 'reviews'} received</p></div>
+      <div className="reputation-note"><h2>Built through completed exchanges</h2><p>Ratings come from students who completed a session with this person. Each participant can review the other participant once per session.</p>{isOwnProfile && <Link className="secondary-button" to="/reviews">Review a completed session</Link>}</div>
+    </section>
     <div className="dashboard-grid profile-skills">
       <section className="content-card"><div className="card-heading"><div><span className="section-kicker">SKILLS I CAN SHARE</span><h2>Teaching skills</h2></div></div><SkillList entries={profile.skillsToTeach} emptyText="No teaching skills added yet." /></section>
       <section className="content-card"><div className="card-heading"><div><span className="section-kicker">SKILLS I WANT TO GAIN</span><h2>Learning goals</h2></div></div><SkillList entries={profile.skillsToLearn} emptyText="No learning skills added yet." /></section>
     </div>
+    <section className="content-card profile-reviews">
+      <div className="card-heading"><div><span className="section-kicker">FEEDBACK FROM THE COMMUNITY</span><h2>Reviews</h2></div></div>
+      {reviewError
+        ? <div className="empty-panel error-panel" role="alert"><p>{reviewError}</p><button className="secondary-button" onClick={() => setReviewRefreshKey((current) => current + 1)}>Try again</button></div>
+        : !reviewSummary
+          ? <p className="subtle-text">Loading reputation and reviews…</p>
+          : Array.isArray(reviewSummary.reviews) && reviewSummary.reviews.length
+            ? <div className="review-list">{reviewSummary.reviews.map((review) => {
+              const rating = Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5 ? review.rating : 0
+              const date = review.createdAt ? new Date(review.createdAt) : null
+              return <article className="review-item" key={review._id}><div className="review-item-heading"><strong>{review.reviewer?.name ?? 'SkillSwap student'}</strong><span className="review-stars" aria-label={`${rating} out of 5 stars`}>{'★'.repeat(rating)}<span>{'★'.repeat(5 - rating)}</span></span><time>{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString([], { dateStyle: 'medium' }) : ''}</time></div>{review.session?.title && <small className="review-session-title">Session: {review.session.title}</small>}{review.comment && <p>{review.comment}</p>}</article>
+            })}</div>
+            : <p className="subtle-text">No reviews yet. Completed exchanges can help build this student's reputation.</p>}
+    </section>
   </AppLayout>
 }
 

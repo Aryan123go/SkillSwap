@@ -124,6 +124,88 @@ test('a stale reschedule loses with a revision check instead of overwriting a co
   assert.equal(capturedUpdate.$set.organizer, recipientId)
 })
 
+test('invalid and missing session IDs return explicit errors', async (t) => {
+  await assert.rejects(confirmSession(participant(recipientId), 'not-a-session-id'), {
+    code: 'INVALID_SESSION_ID',
+  })
+
+  t.mock.method(Session, 'findById', () => readQuery(null))
+  await assert.rejects(confirmSession(participant(recipientId), sessionId), {
+    code: 'SESSION_NOT_FOUND',
+  })
+})
+
+test('decline and cancellation apply only the permitted atomic status transitions', async (t) => {
+  const record = sessionRecord()
+  let capturedFilter
+  t.mock.method(Session, 'findById', () => readQuery(record))
+  t.mock.method(Session, 'findOneAndUpdate', (filter) => {
+    capturedFilter = filter
+    return populatedQuery({ ...record, status: 'DECLINED' })
+  })
+
+  const declined = await declineSession(participant(recipientId), sessionId)
+  assert.equal(declined.status, 'DECLINED')
+  assert.equal(capturedFilter.status, 'PROPOSED')
+  assert.equal(capturedFilter.organizer.$ne, recipientId)
+
+  t.mock.restoreAll()
+  const confirmed = sessionRecord({ status: 'CONFIRMED' })
+  t.mock.method(Session, 'findById', () => readQuery(confirmed))
+  t.mock.method(Session, 'findOneAndUpdate', (filter) => {
+    capturedFilter = filter
+    return populatedQuery({ ...confirmed, status: 'CANCELLED' })
+  })
+
+  const cancelled = await cancelSession(participant(senderId), sessionId)
+  assert.equal(cancelled.status, 'CANCELLED')
+  assert.deepEqual(capturedFilter.status, { $in: ['PROPOSED', 'CONFIRMED'] })
+})
+
+test('rescheduling a valid session returns it to proposed status for reconfirmation', async (t) => {
+  const record = sessionRecord({ status: 'CONFIRMED', revision: 2 })
+  const startAt = new Date(Date.now() + 3 * 60 * 60_000)
+  const endAt = new Date(startAt.getTime() + 60 * 60_000)
+  let capturedFilter
+  let capturedUpdate
+  t.mock.method(Session, 'findById', () => readQuery(record))
+  t.mock.method(Session, 'findOneAndUpdate', (filter, update) => {
+    capturedFilter = filter
+    capturedUpdate = update
+    return populatedQuery({ ...record, ...update.$set, status: 'PROPOSED' })
+  })
+
+  const updated = await rescheduleSession(participant(recipientId), sessionId, {
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
+  })
+  assert.equal(updated.status, 'PROPOSED')
+  assert.equal(capturedFilter.revision, 2)
+  assert.equal(capturedUpdate.$set.organizer, recipientId)
+  assert.equal(capturedUpdate.$set.startAt.getTime(), startAt.getTime())
+  assert.equal(capturedUpdate.$inc.revision, 1)
+})
+
+test('a confirmed session can be completed only after its end and uses an atomic transition', async (t) => {
+  const record = sessionRecord({
+    status: 'CONFIRMED',
+    startAt: new Date(Date.now() - 2 * 60 * 60_000),
+    endAt: new Date(Date.now() - 60 * 60_000),
+  })
+  let capturedFilter
+  t.mock.method(Session, 'findById', () => readQuery(record))
+  t.mock.method(Session, 'findOneAndUpdate', (filter) => {
+    capturedFilter = filter
+    return populatedQuery({ ...record, status: 'COMPLETED' })
+  })
+
+  const completed = await completeSession(participant(recipientId), sessionId)
+  assert.equal(completed.status, 'COMPLETED')
+  assert.equal(capturedFilter.status, 'CONFIRMED')
+  assert.ok(capturedFilter.endAt.$lte instanceof Date)
+  assert.equal(capturedFilter.participants, recipientId)
+})
+
 test('only participants of accepted requests can create sessions and participant IDs come from the request', async (t) => {
   t.mock.method(ExchangeRequest, 'findById', () => ({
     select() { return this },

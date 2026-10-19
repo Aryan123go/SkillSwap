@@ -409,7 +409,7 @@ test('session model enforces participants, ordered dates, and sensible duration'
   await assert.rejects(invalidDuration.validate())
 })
 
-test('protected discovery, request, and session endpoints reject unauthenticated access', async () => {
+test('protected discovery, request, session, chat, and review endpoints reject unauthenticated access', async () => {
   const previousEnvironment = {
     nodeEnv: process.env.NODE_ENV,
     clientUrl: process.env.CLIENT_URL,
@@ -436,6 +436,8 @@ test('protected discovery, request, and session endpoints reject unauthenticated
       '/conversations',
       '/conversations/0123456789abcdef01234567',
       '/conversations/0123456789abcdef01234567/messages',
+      '/reviews/eligible',
+      '/reviews/user/0123456789abcdef01234567',
     ]) {
       const response = await fetch(`${root}${path}`)
       assert.equal(response.status, 401, `${path} should require a session`)
@@ -446,6 +448,12 @@ test('protected discovery, request, and session endpoints reject unauthenticated
       body: JSON.stringify(validSchedule),
     })
     assert.equal(createResponse.status, 401)
+    const reviewResponse = await fetch(`${root}/reviews`, {
+      method: 'POST',
+      headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: '0123456789abcdef01234567', rating: 5 }),
+    })
+    assert.equal(reviewResponse.status, 401)
   } finally {
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()))

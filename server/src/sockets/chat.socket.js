@@ -1,5 +1,6 @@
 import { Server } from 'socket.io'
 import User from '../models/User.js'
+import Conversation from '../models/Conversation.js'
 import { verifyToken } from '../utils/jwt.js'
 import { authorizeConversationRoom, createMessage, getConversationRoom } from '../services/chat.service.js'
 
@@ -83,6 +84,8 @@ export function attachChatSocket(httpServer) {
   })
 
   io.on('connection', (socket) => {
+    // Authenticated sockets join a private user room for inbox previews and unread badges.
+    socket.join(`user:${socket.data.user._id.toString()}`)
     socket.on('conversation:join', async (payload = {}, acknowledge = () => {}) => {
       try {
         const roomId = await authorizeConversationRoom(socket.data.user, payload.conversationId)
@@ -112,6 +115,10 @@ export function attachChatSocket(httpServer) {
         })
         // Persistence succeeds before the canonical message is broadcast.
         io.to(getConversationRoom(roomId)).emit('message:new', { message })
+        const conversation = await Conversation.findById(roomId).select('participants').lean()
+        for (const participantId of conversation?.participants ?? []) {
+          io.to(`user:${participantId.toString()}`).emit('user:message', { conversationId: roomId, message })
+        }
         acknowledge({ success: true, message })
       } catch (error) {
         acknowledge({ success: false, error: safeError(error) })

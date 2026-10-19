@@ -1,4 +1,5 @@
 
+import React from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './AuthContext.jsx'
@@ -17,6 +18,30 @@ import { DiscoveryPage } from './DiscoveryPage.jsx'
 import { RequestsPage } from './RequestsPage.jsx'
 import { SessionDetailPage, SessionsPage } from './SessionsPage.jsx'
 import { ConversationPage, MessagesPage } from './ChatPage.jsx'
+import { ReviewsPage } from './ReviewsPage.jsx'
+
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error) {
+    console.error('SkillSwap page rendering failed:', error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <main className="app-shell"><section className="empty-panel error-panel" role="alert"><h1>This page could not be displayed</h1><p>An unexpected display error occurred. Your saved data has not been intentionally cleared.</p><button className="secondary-button" onClick={() => window.location.reload()}>Reload SkillSwap</button><a className="secondary-button" href="/sessions">Go to sessions</a></section></main>
+    }
+    return this.props.children
+  }
+}
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -42,6 +67,7 @@ function ApplicationRoutes() {
     <Route path="/sessions/:id" element={<ProtectedRoute><SessionDetailPage /></ProtectedRoute>} />
     <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
     <Route path="/messages/:conversationId" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
+    <Route path="/reviews" element={<ProtectedRoute><ReviewsPage /></ProtectedRoute>} />
     <Route path="/profile" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />
     <Route path="/profile/edit" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
     <Route path="/profile/:id" element={sessionError ? <ServiceUnavailablePage message={sessionError} onRetry={refreshSession} /> : <ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -50,5 +76,5 @@ function ApplicationRoutes() {
 }
 
 export default function App() {
-  return <BrowserRouter><AuthProvider><ApplicationRoutes /></AuthProvider></BrowserRouter>
+  return <AppErrorBoundary><BrowserRouter><AuthProvider><ApplicationRoutes /></AuthProvider></BrowserRouter></AppErrorBoundary>
 }

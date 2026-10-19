@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
-import { createMessage, getConversation, getConversationForRequest, listConversations, listMessages } from '../services/chat.service.js'
+import Conversation from '../models/Conversation.js'
+import { createMessage, getConversation, getConversationForRequest, listConversations, listMessages, markConversationRead } from '../services/chat.service.js'
 import { HttpError } from '../utils/HttpError.js'
 
 export async function getConversations(request, response) {
@@ -32,5 +33,22 @@ export async function postMessage(request, response) {
     throw new HttpError(400, 'Use a valid conversation ID.', 'INVALID_CONVERSATION_ID')
   }
   const message = await createMessage(request.user, request.params.id, request.validatedBody)
+  const io = request.app.get('chatIo')
+  if (io) {
+    io.to(`conversation:${request.params.id}`).emit('message:new', { message })
+    const conversation = await Conversation.findById(request.params.id).select('participants').lean()
+    for (const participantId of conversation?.participants ?? []) {
+      io.to(`user:${participantId.toString()}`).emit('user:message', { conversationId: request.params.id, message })
+    }
+  }
   response.status(201).json({ success: true, data: { message } })
+}
+
+export async function markRead(request, response) {
+  if (!mongoose.isValidObjectId(request.params.id)) {
+    throw new HttpError(400, 'Use a valid conversation ID.', 'INVALID_CONVERSATION_ID')
+  }
+  const result = await markConversationRead(request.user, request.params.id)
+  request.app.get('chatIo')?.to(`user:${request.user._id.toString()}`).emit('user:read', { conversationId: result.conversationId })
+  response.json({ success: true, data: result })
 }

@@ -1,6 +1,8 @@
 import React from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './useAuth.js'
+import { io } from 'socket.io-client'
+import { apiRequest } from './api.js'
 import { capitalize, getSkillId, PROFICIENCIES } from './skillUtils.js'
 
 export function Brand() {
@@ -14,6 +16,31 @@ export function Header({ compact = false }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [menuError, setMenuError] = React.useState('')
+  const [unreadTotal, setUnreadTotal] = React.useState(0)
+  const apiOrigin = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+  const socketOrigin = apiOrigin || window.location.origin
+
+  React.useEffect(() => {
+    if (!user) return undefined
+    let active = true
+    let refreshTimer
+    const refreshUnread = async () => {
+      try {
+        const { conversations = [] } = await apiRequest('/conversations')
+        if (active) setUnreadTotal(conversations.reduce((sum, item) => sum + (Number(item.unreadCount) || 0), 0))
+      } catch {
+        // A temporary unread-count failure must not break navigation.
+      }
+    }
+    void refreshUnread()
+    const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
+    socket.on('user:message', () => { void refreshUnread() })
+    socket.on('user:read', () => { void refreshUnread() })
+    // Reconcile missed socket events after reconnects and while the tab is idle.
+    socket.on('connect', () => { void refreshUnread() })
+    refreshTimer = window.setInterval(() => { void refreshUnread() }, 30000)
+    return () => { active = false; window.clearInterval(refreshTimer); socket.disconnect() }
+  }, [user?.id, socketOrigin, location.pathname])
 
   async function handleSignOut() {
     setMenuError('')
@@ -34,7 +61,8 @@ export function Header({ compact = false }) {
         <NavLink to="/requests/sent">Sent requests</NavLink>
         <NavLink to="/requests/received">Received requests</NavLink>
         <NavLink to="/sessions">Sessions</NavLink>
-        <NavLink to="/messages">Messages</NavLink>
+        <NavLink to="/messages" className="messages-nav-link">Messages{unreadTotal > 0 && <span className="unread-badge" aria-label={`${unreadTotal} unread messages`}>{unreadTotal > 99 ? '99+' : unreadTotal}</span>}</NavLink>
+        <NavLink to="/reviews">Reviews</NavLink>
         <NavLink to="/profile">My profile</NavLink>
       </nav>}
       <div className="account-actions">

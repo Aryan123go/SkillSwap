@@ -4,6 +4,7 @@ import {
   getConversationForExchangeRequest,
   getConversations,
   getMessages,
+  markRead,
   postMessage,
 } from '../controllers/chat.controller.js'
 import { requireAuth } from '../middleware/auth.middleware.js'
@@ -14,6 +15,7 @@ const router = Router()
 router.use(requireAuth)
 router.get('/', getConversations)
 router.get('/by-request/:requestId', getConversationForExchangeRequest)
+router.patch('/:id/read', markRead)
 router.get('/:id/messages', getMessages)
 router.post('/:id/messages', validateBody(createMessageSchema), postMessage)
 router.get('/:id', getConversationById)

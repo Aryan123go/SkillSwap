@@ -13,6 +13,7 @@ export function toSafeUser(user) {
     bio: user.bio,
     college: user.college,
     role: user.role,
+    openToAnySkill: user.openToAnySkill ?? false,
     skillsToTeach: user.skillsToTeach,
     skillsToLearn: user.skillsToLearn,
     availability: user.availability,

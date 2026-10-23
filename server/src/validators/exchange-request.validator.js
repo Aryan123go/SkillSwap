@@ -5,7 +5,7 @@ const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Use a valid student and ski
 export const createExchangeRequestSchema = z.object({
   recipient: objectId,
   requestedSkill: objectId,
-  offeredSkill: objectId.optional(),
+  offeredSkill: objectId,
   message: z.string().trim().max(500).optional().default(''),
 }).strict()
 

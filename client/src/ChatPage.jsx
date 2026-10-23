@@ -55,7 +55,7 @@ export function MessagesPage() {
   }, [refreshToken])
 
   useEffect(() => {
-    const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
+    const socket = io(socketOrigin, { withCredentials: true })
     socket.on('user:message', () => {
       setLoading(true)
       setRefreshToken((value) => value + 1)
@@ -121,7 +121,7 @@ export function ConversationPage() {
 
   useEffect(() => {
     if (loading || loadedConversationId !== conversationId || !conversation) return undefined
-    const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
+    const socket = io(socketOrigin, { withCredentials: true })
     socketRef.current = socket
     socket.on('connect', () => {
       setConnection('connected')

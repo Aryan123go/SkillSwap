@@ -277,3 +277,505 @@
 .review-session-title { display: block; margin-top: 6px; color: #8a9188; font-size: 10px; }
 .review-item > p { margin: 8px 0 0; color: #69766c; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 650px) { .review-session-heading { flex-direction: column; }.reputation-card { grid-template-columns: 1fr; gap: 17px; }.reputation-note { padding: 17px 0 0; border-top: 1px solid #eeede8; border-left: 0; }.review-item-heading time { width: 100%; margin-left: 0; }.review-session-card { padding: 17px; } }
+
+
+/* Theme toggle and profile links */
+.header-user { display: inline-flex; align-items: center; text-decoration: none; border-radius: 5px; }
+.header-user:hover, .student-name-link:hover { color: #285d43; text-decoration: underline; text-underline-offset: 3px; }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 1px solid #dfe4dd; border-radius: 18px; background: #f7f7f1; color: #405649; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; }
+.theme-toggle > span:first-child { font-size: 16px; line-height: 1; }
+.theme-toggle:focus-visible, .header-user:focus-visible, .student-name-link:focus-visible { outline: 2px solid #729b7c; outline-offset: 3px; }
+.student-name-link { color: inherit; text-decoration: none; }
+
+/* Dark theme overrides. Scoped to the document theme so light mode stays unchanged. */
+html[data-theme="dark"], body[data-theme="dark"] { background: #141a17; color: #e4e9e3; color-scheme: dark; }
+body[data-theme="dark"] #root, body[data-theme="dark"] .app-shell { background: #141a17; color: #e4e9e3; }
+body[data-theme="dark"] .topbar, body[data-theme="dark"] .app-footer, body[data-theme="dark"] .site-footer .topbar { border-color: #303a33; }
+body[data-theme="dark"] .brand, body[data-theme="dark"] .hero h1, body[data-theme="dark"] .intro-section h2, body[data-theme="dark"] .page-heading h1, body[data-theme="dark"] .content-card h2, body[data-theme="dark"] .profile-card h1, body[data-theme="dark"] .profile-card h2, body[data-theme="dark"] .student-card h2, body[data-theme="dark"] .request-card h2, body[data-theme="dark"] .session-card-heading h2 { color: #e5eee6; }
+body[data-theme="dark"] .main-nav, body[data-theme="dark"] .header-user, body[data-theme="dark"] .login-button, body[data-theme="dark"] .subtle-text, body[data-theme="dark"] .hero-description, body[data-theme="dark"] .intro-section > div:first-child > p, body[data-theme="dark"] .intro-steps p { color: #a8b5aa; }
+body[data-theme="dark"] .main-nav a:hover, body[data-theme="dark"] .main-nav a.active, body[data-theme="dark"] .header-user:hover, body[data-theme="dark"] .student-name-link:hover { color: #a7d0ae; }
+body[data-theme="dark"] .intro-section, body[data-theme="dark"] .content-section, body[data-theme="dark"] .dashboard-section { background: #1b231e; }
+body[data-theme="dark"] .intro-steps article, body[data-theme="dark"] .student-card, body[data-theme="dark"] .request-card, body[data-theme="dark"] .session-card, body[data-theme="dark"] .content-card, body[data-theme="dark"] .profile-card, body[data-theme="dark"] .completion-card, body[data-theme="dark"] .empty-panel, body[data-theme="dark"] .status-card, body[data-theme="dark"] .chat-room, body[data-theme="dark"] .conversation-row, body[data-theme="dark"] .chat-message-content > p { background: #202a23; border-color: #37443a; color: #e0e8e0; }
+body[data-theme="dark"] .art-center, body[data-theme="dark"] .art-note, body[data-theme="dark"] .form-field input, body[data-theme="dark"] .form-field textarea, body[data-theme="dark"] .form-field select, body[data-theme="dark"] .skill-search, body[data-theme="dark"] .skill-option, body[data-theme="dark"] .request-compose textarea, body[data-theme="dark"] .request-compose select, body[data-theme="dark"] input, body[data-theme="dark"] textarea, body[data-theme="dark"] select { background-color: #18211b; border-color: #3a493d; color: #e5eee6; }
+body[data-theme="dark"] input::placeholder, body[data-theme="dark"] textarea::placeholder { color: #91a095; }
+body[data-theme="dark"] .secondary-button, body[data-theme="dark"] .theme-toggle { background: #27352b; border-color: #46564a; color: #d9e8da; }
+body[data-theme="dark"] .art-orbit, body[data-theme="dark"] .bottom-line { border-color: #35443a; background-color: #35443a; }
+body[data-theme="dark"] .art-person { border-color: #202a23; }
+body[data-theme="dark"] .progress-track, body[data-theme="dark"] .mini-avatars { background: #303c32; }
+body[data-theme="dark"] .match-score-breakdown, body[data-theme="dark"] .profile-bio, body[data-theme="dark"] .review-item, body[data-theme="dark"] .session-detail { color: #bdc9be; }
+body[data-theme="dark"] .unread-badge { background: #3b6049; color: #eff8ef; }
+body[data-theme="dark"] .form-field span, body[data-theme="dark"] .student-card h3, body[data-theme="dark"] .request-compose h3 { color: #cbd8cc; }
+body[data-theme="dark"] .status-card h1 { color: #e5eee6; }
+@media (max-width: 540px) { .theme-toggle { padding: 0 8px; } .theme-toggle-label { display: none; } }
+
+
+/* Phase 7 responsive header, theme and account-pill polish */
+.header-user { display:inline-flex; align-items:center; max-width:170px; min-height:36px; padding:0 13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid rgba(111,139,117,.25); border-radius:999px; background:rgba(219,231,216,.42); color:#284a36; font-size:13px; font-weight:650; text-decoration:none; backdrop-filter:blur(10px); }
+.header-user:hover { background:rgba(199,219,195,.65); }
+.theme-toggle { border-radius:999px; background:rgba(255,255,255,.62); border:1px solid rgba(110,130,112,.28); color:#355440; }
+.mobile-nav-toggle { display:none; }
+:root[data-theme="dark"] body, body[data-theme="dark"] { background:#111a16; color:#e4ece5; }
+:root[data-theme="dark"] .topbar { border-color:#293a30; }
+:root[data-theme="dark"] .brand { color:#e1ece2; }
+:root[data-theme="dark"] .main-nav { color:#b1c0b4; }
+:root[data-theme="dark"] .main-nav a:hover, :root[data-theme="dark"] .main-nav a.active { color:#b6d7bd; }
+:root[data-theme="dark"] .header-user { color:#e1eee2; background:rgba(95,128,103,.2); border-color:rgba(150,185,157,.28); }
+:root[data-theme="dark"] .theme-toggle { color:#e4eee5; background:rgba(40,58,46,.72); border-color:#496451; }
+:root[data-theme="dark"] .student-card, :root[data-theme="dark"] .request-card, :root[data-theme="dark"] .content-card, :root[data-theme="dark"] .empty-panel { background:var(--ss-dark-surface); border-color:var(--ss-dark-border); color:var(--ss-dark-text); }
+:root[data-theme="dark"] .student-card-head h2, :root[data-theme="dark"] .request-card-head h2, :root[data-theme="dark"] .page-heading h1, :root[data-theme="dark"] .student-skill-grid h3 { color:#e0ebe1; }
+:root[data-theme="dark"] .form-field input, :root[data-theme="dark"] .form-field select, :root[data-theme="dark"] textarea, :root[data-theme="dark"] input, :root[data-theme="dark"] select { background-color:var(--ss-dark-base); color:var(--ss-dark-text); border-color:var(--ss-dark-border); }
+:root[data-theme="dark"] .secondary-button { background:var(--ss-dark-surface); border-color:var(--ss-dark-border); color:var(--ss-dark-text); }
+@media (max-width:900px) { .topbar { position:relative; z-index:20; height:auto; min-height:70px; padding:12px 20px; gap:10px; flex-wrap:wrap; } .main-nav { gap:12px; } .account-actions { gap:9px; } }
+@media (max-width:760px) {
+ .mobile-nav-toggle { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:0 12px; border:1px solid #d8e1d7; border-radius:10px; background:rgba(239,245,236,.9); color:#294a36; font-size:12px; font-weight:650; }
+ .main-nav { display:none; order:4; width:100%; max-width:none; height:auto; flex-basis:100%; padding:10px; gap:5px; flex-direction:column; align-items:stretch; overflow:visible; border:1px solid rgba(125,150,127,.25); border-radius:14px; background:rgba(247,250,245,.97); box-shadow:0 12px 30px rgba(22,48,31,.10); }
+ .main-nav.is-open { display:flex; } .main-nav a { display:flex; align-items:center; min-height:42px; padding:0 12px; border-radius:9px; font-size:13px; } .main-nav a:hover, .main-nav a.active { background:#e8f0e6; }
+ .account-actions { margin-left:auto; gap:7px; } .header-user { max-width:95px; min-height:34px; padding:0 10px; font-size:12px; }
+ :root[data-theme="dark"] .mobile-nav-toggle { background:var(--ss-dark-surface); color:var(--ss-dark-text); border-color:var(--ss-dark-border); } :root[data-theme="dark"] .main-nav { background:var(--ss-dark-surface); border-color:var(--ss-dark-border); } :root[data-theme="dark"] .main-nav a:hover, :root[data-theme="dark"] .main-nav a.active { background:var(--ss-dark-accent); }
+}
+@media (max-width:430px) { .topbar { padding:10px 12px; gap:8px; } .brand { font-size:17px; gap:6px; } .account-actions { gap:5px; } .header-user { max-width:76px; } .theme-toggle { min-height:33px; padding:0 8px; } .theme-toggle-label { display:none; } }
+
+
+/* SkillSwap dark palette refresh — supplied palette: #092328, #12544F, #2A835F, #8BBB92 */
+:root {
+  --ss-dark-base: #092328;
+  --ss-dark-surface: #12544f;
+  --ss-dark-raised: #12544f;
+  --ss-dark-accent: #2a835f;
+  --ss-dark-soft: #8bbb92;
+  --ss-dark-text: #edf6ef;
+  --ss-dark-muted: #b0cfc0;
+  --ss-dark-border: rgba(139, 187, 146, .24);
+}
+html[data-theme="dark"], body[data-theme="dark"], body[data-theme="dark"] #root,
+body[data-theme="dark"] .app-shell, body[data-theme="dark"] .auth-page,
+body[data-theme="dark"] .status-page {
+  background: var(--ss-dark-base) !important;
+  color: var(--ss-dark-text);
+  color-scheme: dark;
+}
+body[data-theme="dark"] .topbar {
+  background: rgba(9, 35, 40, .94);
+  border-color: var(--ss-dark-border);
+}
+body[data-theme="dark"] .brand, body[data-theme="dark"] .brand-light,
+body[data-theme="dark"] .page-heading h1, body[data-theme="dark"] .hero h1,
+body[data-theme="dark"] .intro-section h2, body[data-theme="dark"] .content-card h2,
+body[data-theme="dark"] .profile-card h1, body[data-theme="dark"] .profile-card h2,
+body[data-theme="dark"] .student-card h2, body[data-theme="dark"] .request-card h2,
+body[data-theme="dark"] .session-card-heading h2, body[data-theme="dark"] .status-card h1,
+body[data-theme="dark"] .reputation-note h2, body[data-theme="dark"] .chat-room-header h1 {
+  color: var(--ss-dark-text);
+}
+body[data-theme="dark"] .brand-mark { background: var(--ss-dark-accent); color: #fff; }
+body[data-theme="dark"] .main-nav, body[data-theme="dark"] .header-user,
+body[data-theme="dark"] .login-button, body[data-theme="dark"] .subtle-text,
+body[data-theme="dark"] .hero-description, body[data-theme="dark"] .page-heading p,
+body[data-theme="dark"] .intro-section > div:first-child > p,
+body[data-theme="dark"] .intro-steps p, body[data-theme="dark"] .student-card p,
+body[data-theme="dark"] .conversation-summary > span, body[data-theme="dark"] .chat-room-header p,
+body[data-theme="dark"] .chat-composer-footer > small {
+  color: var(--ss-dark-muted);
+}
+body[data-theme="dark"] .main-nav a:hover, body[data-theme="dark"] .main-nav a.active,
+body[data-theme="dark"] .student-name-link:hover, body[data-theme="dark"] .header-user:hover {
+  color: var(--ss-dark-soft);
+}
+body[data-theme="dark"] .intro-section, body[data-theme="dark"] .content-section,
+body[data-theme="dark"] .dashboard-section, body[data-theme="dark"] .site-footer,
+body[data-theme="dark"] .site-footer .topbar {
+  background: var(--ss-dark-surface);
+}
+body[data-theme="dark"] .intro-steps article, body[data-theme="dark"] .student-card,
+body[data-theme="dark"] .request-card, body[data-theme="dark"] .session-card,
+body[data-theme="dark"] .content-card, body[data-theme="dark"] .profile-card,
+body[data-theme="dark"] .completion-card, body[data-theme="dark"] .empty-panel,
+body[data-theme="dark"] .status-card, body[data-theme="dark"] .auth-card,
+body[data-theme="dark"] .conversation-row, body[data-theme="dark"] .chat-room,
+body[data-theme="dark"] .review-session-card, body[data-theme="dark"] .review-item,
+body[data-theme="dark"] .reputation-card {
+  background: var(--ss-dark-surface);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .12);
+}
+body[data-theme="dark"] .form-field input, body[data-theme="dark"] .form-field textarea,
+body[data-theme="dark"] .form-field select, body[data-theme="dark"] .skill-search,
+body[data-theme="dark"] .skill-option, body[data-theme="dark"] .request-compose textarea,
+body[data-theme="dark"] .request-compose select, body[data-theme="dark"] input,
+body[data-theme="dark"] textarea, body[data-theme="dark"] select,
+body[data-theme="dark"] .chat-composer textarea {
+  background: #092328;
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+body[data-theme="dark"] input::placeholder, body[data-theme="dark"] textarea::placeholder { color: #91b4a4; }
+body[data-theme="dark"] .primary-button, body[data-theme="dark"] .join-button {
+  background: var(--ss-dark-accent);
+  color: #fff;
+}
+body[data-theme="dark"] .primary-button:hover, body[data-theme="dark"] .join-button:hover { background: #32966e; }
+body[data-theme="dark"] .secondary-button, body[data-theme="dark"] .theme-toggle,
+body[data-theme="dark"] .mobile-nav-toggle {
+  background: rgba(18, 84, 79, .65);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+body[data-theme="dark"] .header-user {
+  background: rgba(42, 131, 95, .24);
+  border-color: rgba(139, 187, 146, .35);
+  color: var(--ss-dark-text);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
+}
+body[data-theme="dark"] .theme-toggle { background: rgba(18, 84, 79, .55); }
+body[data-theme="dark"] .skill-tag { background: rgba(18, 84, 79, .4); border-color: var(--ss-dark-border); color: var(--ss-dark-text); }
+body[data-theme="dark"] .student-rating-stars, body[data-theme="dark"] .reputation-number span { color: var(--ss-dark-soft); }
+body[data-theme="dark"] .match-score { background: rgba(42, 131, 95, .24); color: var(--ss-dark-soft); }
+body[data-theme="dark"] .match-score-breakdown, body[data-theme="dark"] .profile-bio,
+body[data-theme="dark"] .review-item, body[data-theme="dark"] .session-detail,
+body[data-theme="dark"] .reputation-note p { color: #c0d9ca; }
+body[data-theme="dark"] .unread-badge, body[data-theme="dark"] .conversation-unread-badge {
+  background: var(--ss-dark-accent); color: #fff; border: 1px solid rgba(139,187,146,.3);
+}
+body[data-theme="dark"] .conversation-row:has(.conversation-unread-badge) {
+  background: rgba(18, 84, 79, .45); border-color: var(--ss-dark-soft);
+}
+body[data-theme="dark"] .chat-room-header, body[data-theme="dark"] .chat-composer { border-color: var(--ss-dark-border); }
+body[data-theme="dark"] .chat-history {
+  background: #092328;
+  scrollbar-color: #2a835f #0d3033;
+}
+body[data-theme="dark"] .chat-message-content > p {
+  background: #12544f; border: 1px solid rgba(139,187,146,.18); color: #edf6ef;
+}
+body[data-theme="dark"] .chat-message-own .chat-message-content > p {
+  background: #2a835f; border-color: rgba(139,187,146,.25); color: #fff;
+}
+body[data-theme="dark"] .chat-message-content small, body[data-theme="dark"] .chat-message-content time,
+body[data-theme="dark"] .chat-empty p { color: var(--ss-dark-muted); }
+body[data-theme="dark"] .chat-message-avatar, body[data-theme="dark"] .conversation-avatar {
+  background: #12544f; color: var(--ss-dark-text);
+}
+body[data-theme="dark"] .chat-composer textarea:focus { outline-color: #2a835f; border-color: #8bbb92; }
+body[data-theme="dark"] .progress-track, body[data-theme="dark"] .mini-avatars,
+body[data-theme="dark"] .art-orbit, body[data-theme="dark"] .bottom-line { background-color: #12544f; border-color: var(--ss-dark-border); }
+body[data-theme="dark"] .art-center, body[data-theme="dark"] .art-note { background: #12544f; border-color: var(--ss-dark-border); color: var(--ss-dark-text); }
+body[data-theme="dark"] .art-person { border-color: var(--ss-dark-base); }
+body[data-theme="dark"] .form-alert, body[data-theme="dark"] .error-banner { background: #3a2020; border-color: #77413d; color: #ffd9d5; }
+body[data-theme="dark"] .success-message { color: var(--ss-dark-soft); }
+body[data-theme="dark"] .reputation-note { border-color: var(--ss-dark-border); }
+
+/* Show the reputation on Discover cards without disturbing the match-score layout. */
+.student-reputation { display:flex; align-items:center; gap:6px; margin: 12px 0 2px; color:#65776a; font-size:11px; }
+.student-rating-stars { color:#b58a36; font-size:15px; line-height:1; }
+.student-reputation strong { color:#315f49; font-size:12px; }
+.student-reputation > span:last-child { color:#89958a; }
+body[data-theme="dark"] .student-reputation, body[data-theme="dark"] .student-reputation strong { color:var(--ss-dark-soft); }
+body[data-theme="dark"] .student-reputation > span:last-child { color:var(--ss-dark-muted); }
+
+/* Conversation view: keep the composer visible; only the message history scrolls. */
+.app-shell:has(.chat-room) .chat-page-content { width:min(100% - 32px, 1180px); padding-top:12px; padding-bottom:12px; }
+.app-shell:has(.chat-room) .app-footer { display:none; }
+.chat-room { height:calc(100dvh - 118px); min-height:420px; max-height:1000px; grid-template-rows:auto minmax(0, 1fr) auto; }
+.chat-history { min-height:0; max-height:none; overscroll-behavior:contain; }
+.chat-composer { gap:7px; padding:10px 14px; }
+.chat-composer textarea { min-height:46px; max-height:110px; resize:vertical; }
+.chat-room-header { padding-top:12px; padding-bottom:12px; }
+@media (max-width:760px) {
+  .app-shell:has(.chat-room) .chat-page-content { width:calc(100% - 16px); padding-top:8px; padding-bottom:8px; }
+  .chat-room { height:calc(100dvh - 105px); min-height:360px; }
+  .chat-room-header { gap:8px; padding:10px; }
+  .chat-room-header .conversation-avatar { width:38px; height:38px; }
+  .chat-composer { padding:9px; }
+  .chat-composer textarea { min-height:42px; }
+}
+@media (max-height:600px) {
+  .chat-room { height:calc(100dvh - 92px); min-height:300px; }
+  .chat-room-header { padding-top:7px; padding-bottom:7px; }
+  .chat-composer { padding-top:7px; padding-bottom:7px; }
+}
+
+/* Keep all current screens aligned to the Phase 7 dark palette. */
+body[data-theme="dark"] .topbar,
+body[data-theme="dark"] .intro-section,
+body[data-theme="dark"] .content-section,
+body[data-theme="dark"] .dashboard-section,
+body[data-theme="dark"] .site-footer,
+body[data-theme="dark"] .app-content,
+body[data-theme="dark"] .hero {
+  background: var(--ss-dark-base);
+}
+
+body[data-theme="dark"] .intro-steps article,
+body[data-theme="dark"] .student-card,
+body[data-theme="dark"] .request-card,
+body[data-theme="dark"] .session-card,
+body[data-theme="dark"] .content-card,
+body[data-theme="dark"] .profile-card,
+body[data-theme="dark"] .completion-card,
+body[data-theme="dark"] .empty-panel,
+body[data-theme="dark"] .status-card,
+body[data-theme="dark"] .auth-card,
+body[data-theme="dark"] .conversation-row,
+body[data-theme="dark"] .chat-room,
+body[data-theme="dark"] .review-session-card,
+body[data-theme="dark"] .review-item,
+body[data-theme="dark"] .reputation-card,
+body[data-theme="dark"] dialog,
+body[data-theme="dark"] [role="dialog"],
+body[data-theme="dark"] [popover] {
+  background: var(--ss-dark-surface);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .chat-room-header,
+body[data-theme="dark"] .chat-composer,
+body[data-theme="dark"] .review-session-heading,
+body[data-theme="dark"] .review-item {
+  border-color: var(--ss-dark-border);
+}
+
+body[data-theme="dark"] .chat-history,
+body[data-theme="dark"] input,
+body[data-theme="dark"] textarea,
+body[data-theme="dark"] select,
+body[data-theme="dark"] .form-field input,
+body[data-theme="dark"] .form-field textarea,
+body[data-theme="dark"] .form-field select,
+body[data-theme="dark"] .skill-search,
+body[data-theme="dark"] .chat-composer textarea {
+  background-color: var(--ss-dark-base);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] select option {
+  background: var(--ss-dark-base);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] input::placeholder,
+body[data-theme="dark"] textarea::placeholder {
+  color: var(--ss-dark-muted);
+  opacity: 1;
+}
+
+body[data-theme="dark"] input[type="checkbox"],
+body[data-theme="dark"] input[type="radio"] {
+  accent-color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .header-user,
+body[data-theme="dark"] .theme-toggle,
+body[data-theme="dark"] .secondary-button,
+body[data-theme="dark"] .mobile-nav-toggle,
+body[data-theme="dark"] .skill-tag,
+body[data-theme="dark"] .rating-choice,
+body[data-theme="dark"] .chat-connection,
+body[data-theme="dark"] .conversation-avatar,
+body[data-theme="dark"] .chat-message-avatar,
+body[data-theme="dark"] .request-status,
+body[data-theme="dark"] .art-center,
+body[data-theme="dark"] .art-note {
+  background-color: var(--ss-dark-surface);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .main-nav a:hover,
+body[data-theme="dark"] .main-nav a.active,
+body[data-theme="dark"] .student-name-link:hover,
+body[data-theme="dark"] .header-user:hover {
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .main-nav a:focus-visible,
+body[data-theme="dark"] .header-user:focus-visible,
+body[data-theme="dark"] .theme-toggle:focus-visible,
+body[data-theme="dark"] .mobile-nav-toggle:focus-visible,
+body[data-theme="dark"] .student-name-link:focus-visible,
+body[data-theme="dark"] button:focus-visible,
+body[data-theme="dark"] a:focus-visible,
+body[data-theme="dark"] input:focus-visible,
+body[data-theme="dark"] textarea:focus-visible,
+body[data-theme="dark"] select:focus-visible {
+  outline: 2px solid var(--ss-dark-soft);
+  outline-offset: 3px;
+}
+
+body[data-theme="dark"] input:focus,
+body[data-theme="dark"] textarea:focus,
+body[data-theme="dark"] select:focus,
+body[data-theme="dark"] .chat-composer textarea:focus {
+  border-color: var(--ss-dark-soft);
+  box-shadow: 0 0 0 3px rgba(139, 187, 146, .2);
+}
+
+body[data-theme="dark"] .primary-button,
+body[data-theme="dark"] .join-button,
+body[data-theme="dark"] .unread-badge,
+body[data-theme="dark"] .conversation-unread-badge {
+  background: var(--ss-dark-accent);
+  color: #fff;
+}
+
+body[data-theme="dark"] .primary-button:hover,
+body[data-theme="dark"] .join-button:hover,
+body[data-theme="dark"] .secondary-button:hover,
+body[data-theme="dark"] .theme-toggle:hover,
+body[data-theme="dark"] .mobile-nav-toggle:hover {
+  background: var(--ss-dark-soft);
+  border-color: var(--ss-dark-soft);
+  color: var(--ss-dark-base);
+}
+
+body[data-theme="dark"] button:disabled,
+body[data-theme="dark"] input:disabled,
+body[data-theme="dark"] select:disabled,
+body[data-theme="dark"] textarea:disabled,
+body[data-theme="dark"] [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+body[data-theme="dark"] .skill-option.is-selected,
+body[data-theme="dark"] .rating-choice.selected {
+  background: rgba(139, 187, 146, .16);
+  border-color: var(--ss-dark-soft);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .skill-option.is-selected,
+body[data-theme="dark"] .rating-choice.selected,
+body[data-theme="dark"] .match-score,
+body[data-theme="dark"] .student-rating-stars,
+body[data-theme="dark"] .reputation-number span,
+body[data-theme="dark"] .success-message {
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .progress-track,
+body[data-theme="dark"] .mini-avatars {
+  background: var(--ss-dark-base);
+}
+
+body[data-theme="dark"] .progress-track i {
+  background: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .completion-icon {
+  background: var(--ss-dark-base);
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .status-pending,
+body[data-theme="dark"] .status-accepted,
+body[data-theme="dark"] .chat-connection-connected {
+  background: rgba(139, 187, 146, .16);
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .status-rejected,
+body[data-theme="dark"] .status-cancelled {
+  background: var(--ss-dark-base);
+  color: var(--ss-dark-muted);
+}
+
+body[data-theme="dark"] .chat-connection-offline {
+  background: #3a2020;
+  color: #ffd9d5;
+}
+
+body[data-theme="dark"] .chat-message-content > p {
+  background: var(--ss-dark-surface);
+  border-color: var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .chat-message-own .chat-message-content > p {
+  background: var(--ss-dark-accent);
+  border-color: var(--ss-dark-soft);
+  color: #fff;
+}
+
+body[data-theme="dark"] dialog::backdrop {
+  background: rgba(9, 35, 40, .78);
+}
+
+body[data-theme="dark"] [role="tooltip"] {
+  background: var(--ss-dark-surface);
+  border: 1px solid var(--ss-dark-border);
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] :is(h1, h2, h3, h4, legend, label, strong) {
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] :is(p, small, time, .section-kicker, .eyebrow) {
+  color: var(--ss-dark-muted);
+}
+
+body[data-theme="dark"] a {
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .brand,
+body[data-theme="dark"] .brand-light {
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .main-nav a:hover,
+body[data-theme="dark"] .main-nav a.active,
+body[data-theme="dark"] .header-user,
+body[data-theme="dark"] .theme-toggle,
+body[data-theme="dark"] .secondary-button,
+body[data-theme="dark"] .mobile-nav-toggle,
+body[data-theme="dark"] .chat-room-header .secondary-button {
+  color: var(--ss-dark-text);
+}
+
+body[data-theme="dark"] .student-reputation strong,
+body[data-theme="dark"] .student-reputation,
+body[data-theme="dark"] .student-rating-stars,
+body[data-theme="dark"] .review-stars,
+body[data-theme="dark"] .rating-choice span,
+body[data-theme="dark"] .reputation-number span,
+body[data-theme="dark"] .heading-dot,
+body[data-theme="dark"] .sparkle,
+body[data-theme="dark"] .art-star,
+body[data-theme="dark"] .art-note span {
+  color: var(--ss-dark-soft);
+}
+
+body[data-theme="dark"] .primary-button:hover,
+body[data-theme="dark"] .join-button:hover,
+body[data-theme="dark"] .secondary-button:hover,
+body[data-theme="dark"] .theme-toggle:hover,
+body[data-theme="dark"] .mobile-nav-toggle:hover {
+  background: var(--ss-dark-soft);
+  border-color: var(--ss-dark-soft);
+  color: var(--ss-dark-base);
+}
+
+@media (max-width: 760px) {
+  body[data-theme="dark"] .main-nav {
+    background: var(--ss-dark-surface);
+    border-color: var(--ss-dark-border);
+  }
+}
+
+  .open-any-toggle { display: flex; align-items: center; gap: 9px; padding: 12px 14px; margin-top: 16px; border: 1px solid #d9e7da; border-radius: 8px; background: #f6faf5; color: #315b43; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .open-any-toggle input { width: 16px; height: 16px; margin: 0; accent-color: #2a835f; }
+  .open-any-description { margin: 0; color: #607568; font-size: 11px; line-height: 1.6; }
+  .open-any-badge { display: inline-flex; width: fit-content; align-items: center; padding: 5px 9px; border: 1px solid #b9d9bd; border-radius: 999px; background: #edf6ee; color: #285b3d; font-size: 10px; font-weight: 700; }
+  .request-skill-summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px; border: 1px solid #e5ece4; border-radius: 7px; background: #fafcf9; }
+  .request-skill-summaries h4 { margin: 0 0 8px; color: #405448; font-size: 10px; }
+  .offer-skill-empty { margin: 0; color: #8a513a; font-size: 11px; line-height: 1.5; }
+  body[data-theme="dark"] .open-any-toggle,
+  body[data-theme="dark"] .request-skill-summaries { border-color: var(--ss-dark-border); background: var(--ss-dark-base); color: var(--ss-dark-text); }
+  body[data-theme="dark"] .open-any-badge { border-color: var(--ss-dark-soft); background: rgba(42, 131, 95, .28); color: var(--ss-dark-text); }
+  body[data-theme="dark"] .request-skill-summaries h4 { color: var(--ss-dark-text); }
+  body[data-theme="dark"] .offer-skill-empty { color: #ffbf9a; }
+  @media (max-width: 540px) { .request-skill-summaries { grid-template-columns: 1fr; } }

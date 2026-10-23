@@ -10,6 +10,7 @@ export const updateUserSchema = z.object({
   bio: z.string().trim().max(500),
   college: z.string().trim().max(120),
   profileImage: z.string().trim().max(2048).optional(),
+  openToAnySkill: z.boolean().optional(),
   skillsToTeach: z.array(userSkill),
   skillsToLearn: z.array(userSkill),
   availability: z.object({

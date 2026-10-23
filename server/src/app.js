@@ -1,6 +1,9 @@
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import express from 'express'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/user.routes.js'
 import skillRoutes from './routes/skill.routes.js'
@@ -11,11 +14,15 @@ import reviewRoutes from './routes/review.routes.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import { HttpError } from './utils/HttpError.js'
 
+const clientBuildDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist')
+
+function configuredOrigins() {
+  const clientOrigins = process.env.CLIENT_URL?.trim() || process.env.RENDER_EXTERNAL_URL || ''
+  return clientOrigins.split(',').map((origin) => origin.trim()).filter(Boolean)
+}
+
 function isAllowedOrigin(origin) {
-  const allowedOrigins = (process.env.CLIENT_URL ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
+  const allowedOrigins = configuredOrigins()
   if (allowedOrigins.includes(origin)) return true
 
   if (process.env.NODE_ENV !== 'production') {
@@ -44,10 +51,7 @@ function requireTrustedOrigin(request, _response, next) {
 }
 
 export function createApp() {
-  const allowedOrigins = (process.env.CLIENT_URL ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
+  const allowedOrigins = configuredOrigins()
 
   if (allowedOrigins.length === 0) {
     throw new Error('CLIENT_URL must contain at least one allowed frontend origin.')
@@ -79,6 +83,24 @@ export function createApp() {
   app.use('/api/sessions', sessionRoutes)
   app.use('/api/conversations', chatRoutes)
   app.use('/api/reviews', reviewRoutes)
+
+  if (process.env.NODE_ENV === 'production' && existsSync(path.join(clientBuildDirectory, 'index.html'))) {
+    app.use(express.static(clientBuildDirectory, { index: false }))
+    app.get(/.*/, (request, response, next) => {
+      if (request.path === '/api' || request.path.startsWith('/api/') || request.path.startsWith('/socket.io/')) {
+        next()
+        return
+      }
+      if (!request.accepts('html')) {
+        next()
+        return
+      }
+      response.sendFile(path.join(clientBuildDirectory, 'index.html'), (error) => {
+        if (error) next(error)
+      })
+    })
+  }
+
   app.use(notFoundHandler)
   app.use(errorHandler)
   return app

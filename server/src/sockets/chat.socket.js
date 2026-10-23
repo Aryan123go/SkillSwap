@@ -5,7 +5,8 @@ import { verifyToken } from '../utils/jwt.js'
 import { authorizeConversationRoom, createMessage, getConversationRoom } from '../services/chat.service.js'
 
 function allowedOrigin(origin) {
-  const configured = (process.env.CLIENT_URL ?? '').split(',').map((item) => item.trim()).filter(Boolean)
+  const clientOrigins = process.env.CLIENT_URL?.trim() || process.env.RENDER_EXTERNAL_URL || ''
+  const configured = clientOrigins.split(',').map((item) => item.trim()).filter(Boolean)
   if (origin && configured.includes(origin)) return true
   if (process.env.NODE_ENV !== 'production' && origin) {
     try {

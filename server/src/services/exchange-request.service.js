@@ -4,6 +4,7 @@ import Skill from '../models/Skill.js'
 import User from '../models/User.js'
 import { HttpError } from '../utils/HttpError.js'
 import { normalizeSkill } from '../utils/normalizeSkill.js'
+import { getEligibleOfferSkills, proficiencyLevels } from '../utils/skillEligibility.js'
 
 const requestPopulate = [
   { path: 'sender', select: '_id name profileImage college' },
@@ -21,19 +22,26 @@ function requireStudent(student) {
 function includesSkill(entries, skillId) {
   return (entries ?? []).some((entry) => {
     const skill = entry.skill?._id ?? entry.skill
-    return skill?.toString() === skillId
+    return skill?.toString().toLowerCase() === skillId.toLowerCase()
   })
 }
 
-function hasEquivalentSkill(entries, selectedSkill) {
-  const selectedTerms = new Set([selectedSkill.normalizedName, ...(selectedSkill.aliases ?? [])].map(normalizeSkill))
-  return (entries ?? []).some((entry) => {
+function skillTerms(skill) {
+  return new Set([skill.normalizedName ?? skill.name, ...(Array.isArray(skill.aliases) ? skill.aliases : [])]
+    .filter((term) => typeof term === 'string' && term.trim())
+    .map(normalizeSkill))
+}
+
+function findEquivalentEntry(entries, selectedSkill) {
+  const selectedTerms = skillTerms(selectedSkill)
+  const matches = (entries ?? []).filter((entry) => {
     const skill = entry.skill
-    return skill && typeof skill === 'object'
-      && [skill.normalizedName ?? skill.name, ...(skill.aliases ?? [])]
-        .map(normalizeSkill)
-        .some((term) => selectedTerms.has(term))
+    if (!skill || typeof skill !== 'object' || !Object.hasOwn(proficiencyLevels, entry.proficiency)) return false
+    return [...skillTerms(skill)].some((term) => selectedTerms.has(term))
   })
+  return matches.reduce((highest, entry) => (
+    !highest || proficiencyLevels[entry.proficiency] > proficiencyLevels[highest.proficiency] ? entry : highest
+  ), null)
 }
 
 export async function createExchangeRequest(sender, input) {
@@ -42,41 +50,58 @@ export async function createExchangeRequest(sender, input) {
     { path: 'skillsToTeach.skill', select: 'name normalizedName aliases' },
     { path: 'skillsToLearn.skill', select: 'name normalizedName aliases' },
   ])
-  if (sender._id.toString() === input.recipient) {
+  const recipientId = input.recipient.toLowerCase()
+  const requestedSkillId = input.requestedSkill.toLowerCase()
+  const offeredSkillId = input.offeredSkill.toLowerCase()
+  if (sender._id.toString().toLowerCase() === recipientId) {
     throw new HttpError(400, 'You cannot send an exchange request to yourself.', 'SELF_REQUEST')
-  }
-  if (input.offeredSkill && !includesSkill(sender.skillsToTeach, input.offeredSkill)) {
-    throw new HttpError(400, 'The offered skill must be one you can teach.', 'OFFERED_SKILL_NOT_SELECTED')
   }
 
   const [recipient, skills] = await Promise.all([
-    User.findOne({ _id: input.recipient, role: 'STUDENT' })
-      .select('_id skillsToTeach')
-      .populate('skillsToTeach.skill', 'name normalizedName aliases'),
-    Skill.find({ _id: { $in: [input.requestedSkill, ...(input.offeredSkill ? [input.offeredSkill] : [])] }, status: 'ACTIVE' })
+    User.findOne({ _id: recipientId, role: 'STUDENT' })
+      .select('_id openToAnySkill skillsToTeach skillsToLearn')
+      .populate('skillsToTeach.skill', 'name normalizedName aliases')
+      .populate('skillsToLearn.skill', 'name normalizedName aliases'),
+    Skill.find({ _id: { $in: [requestedSkillId, offeredSkillId] }, status: 'ACTIVE' })
       .select('_id name normalizedName aliases'),
   ])
   if (!recipient) throw new HttpError(404, 'This student could not be found.', 'RECIPIENT_NOT_FOUND')
   const skillsById = new Map(skills.map((skill) => [skill._id.toString(), skill]))
-  const requestedSkill = skillsById.get(input.requestedSkill)
-  const offeredSkill = input.offeredSkill ? skillsById.get(input.offeredSkill) : null
+  const requestedSkill = skillsById.get(requestedSkillId)
+  const offeredSkill = skillsById.get(offeredSkillId)
   if (!requestedSkill) throw new HttpError(400, 'Select an active skill from the catalogue.', 'INVALID_SKILL')
-  if (!hasEquivalentSkill(sender.skillsToLearn, requestedSkill)) {
+  const senderLearningEntry = sender.openToAnySkill === true
+    ? null
+    : findEquivalentEntry(sender.skillsToLearn, requestedSkill)
+  const recipientTeachingEntry = findEquivalentEntry(recipient.skillsToTeach, requestedSkill)
+  if (!senderLearningEntry && sender.openToAnySkill !== true) {
     throw new HttpError(400, 'Choose a skill from your learning interests.', 'REQUESTED_SKILL_NOT_SELECTED')
   }
-  if (!hasEquivalentSkill(recipient.skillsToTeach, requestedSkill)) {
+  if (!recipientTeachingEntry) {
     throw new HttpError(400, 'The selected student is not offering that skill.', 'RECIPIENT_DOES_NOT_TEACH_SKILL')
   }
-  if (input.offeredSkill && (!offeredSkill || !includesSkill(sender.skillsToTeach, input.offeredSkill))) {
-    throw new HttpError(400, 'Select an active skill you can teach.', 'INVALID_SKILL')
+  if (senderLearningEntry && proficiencyLevels[recipientTeachingEntry.proficiency] < proficiencyLevels[senderLearningEntry.proficiency]) {
+    throw new HttpError(400, 'The selected student does not meet your requested proficiency.', 'TEACHER_PROFICIENCY_TOO_LOW')
+  }
+  if (!includesSkill(sender.skillsToTeach, offeredSkillId)) {
+    throw new HttpError(400, 'Select an active skill you can teach.', 'OFFERED_SKILL_NOT_SELECTED')
+  }
+  if (!getEligibleOfferSkills(
+    sender.skillsToTeach,
+    recipient.skillsToLearn,
+    recipient.openToAnySkill === true,
+  ).some(({ entry }) => (
+    (entry.skill?._id ?? entry.skill).toString().toLowerCase() === offeredSkillId
+  ))) {
+    throw new HttpError(400, 'The offered skill does not meet this student’s learning requirements.', 'OFFERED_SKILL_NOT_ELIGIBLE')
   }
 
   try {
     const request = await ExchangeRequest.create({
       sender: sender._id,
       recipient: recipient._id,
-      requestedSkill: input.requestedSkill,
-      offeredSkill: input.offeredSkill ?? null,
+      requestedSkill: requestedSkillId,
+      offeredSkill: offeredSkillId,
       message: input.message,
     })
     return ExchangeRequest.findById(request._id).populate(requestPopulate)

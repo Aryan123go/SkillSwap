@@ -139,7 +139,7 @@ export function DashboardPage() {
     </section>
     <div className="dashboard-grid">
       <section className="content-card"><div className="card-heading"><div><span className="section-kicker">WHAT YOU CAN SHARE</span><h2>Teaching skills</h2></div><Link to="/profile/edit">Edit</Link></div><SkillList entries={user.skillsToTeach} emptyText="Add skills you'd be happy to teach." /></section>
-      <section className="content-card"><div className="card-heading"><div><span className="section-kicker">WHAT YOU WANT TO LEARN</span><h2>Learning goals</h2></div><Link to="/profile/edit">Edit</Link></div><SkillList entries={user.skillsToLearn} emptyText="Add skills you'd like to learn." /></section>
+      <section className="content-card"><div className="card-heading"><div><span className="section-kicker">WHAT YOU WANT TO LEARN</span><h2>Learning goals</h2></div><Link to="/profile/edit">Edit</Link></div>{user.openToAnySkill ? <span className="open-any-badge">Open to any skill</span> : <SkillList entries={user.skillsToLearn} emptyText="Add skills you'd like to learn." />}</section>
     </div>
   </AppLayout>
 }
@@ -190,7 +190,7 @@ export function ProfilePage() {
     </section>
     <div className="dashboard-grid profile-skills">
       <section className="content-card"><div className="card-heading"><div><span className="section-kicker">SKILLS I CAN SHARE</span><h2>Teaching skills</h2></div></div><SkillList entries={profile.skillsToTeach} emptyText="No teaching skills added yet." /></section>
-      <section className="content-card"><div className="card-heading"><div><span className="section-kicker">SKILLS I WANT TO GAIN</span><h2>Learning goals</h2></div></div><SkillList entries={profile.skillsToLearn} emptyText="No learning skills added yet." /></section>
+      <section className="content-card"><div className="card-heading"><div><span className="section-kicker">SKILLS I WANT TO GAIN</span><h2>Learning goals</h2></div></div>{profile.openToAnySkill ? <><span className="open-any-badge">Open to any skill</span><p className="open-any-description">This student is open to learning any skill you can teach.</p></> : <SkillList entries={profile.skillsToLearn} emptyText="No learning skills added yet." />}</section>
     </div>
     <section className="content-card profile-reviews">
       <div className="card-heading"><div><span className="section-kicker">FEEDBACK FROM THE COMMUNITY</span><h2>Reviews</h2></div></div>
@@ -266,7 +266,7 @@ export function EditProfilePage() {
       <section className="content-card form-section"><h2>About you</h2><FormField label="Full name" name="name" minLength={2} maxLength={80} required value={form.name} onChange={updateField} /><FormField label="College" name="college" maxLength={120} value={form.college} onChange={updateField} /><label className="form-field"><span>Bio</span><textarea name="bio" rows="4" maxLength="500" value={form.bio} onChange={updateField} placeholder="A little about you and what you're interested in…" /><small className="character-count">{form.bio.length}/500</small></label></section>
       {skills.length > 0 && <>
         <section className="content-card"><SkillChoices title="Skills I can teach" description="Select the skills you can share and set your proficiency." skills={skills} entries={form.skillsToTeach} onChange={(skillsToTeach) => setForm((current) => ({ ...current, skillsToTeach }))} /></section>
-        <section className="content-card"><SkillChoices title="Skills I want to learn" description="Choose the skills you'd like to develop." skills={skills} entries={form.skillsToLearn} onChange={(skillsToLearn) => setForm((current) => ({ ...current, skillsToLearn }))} /></section>
+        <section className="content-card"><SkillChoices title="Skills I want to learn" description="Choose the skills you'd like to develop." skills={skills} entries={form.skillsToLearn} onChange={(skillsToLearn) => setForm((current) => ({ ...current, skillsToLearn }))} openToAnySkill={form.openToAnySkill} onOpenToAnyChange={(openToAnySkill) => setForm((current) => ({ ...current, openToAnySkill }))} /></section>
       </>}
       {error && <p className="form-alert" role="alert">{error}</p>}
       {success && <p className="success-message" role="status">{success}</p>}
@@ -285,7 +285,7 @@ function getCompletion(user) {
     Boolean(user.bio),
     Boolean(user.college),
     user.skillsToTeach.length > 0,
-    user.skillsToLearn.length > 0,
+    user.openToAnySkill || user.skillsToLearn.length > 0,
   ]
   return Math.round(checks.filter(Boolean).length / checks.length * 100)
 }
@@ -295,6 +295,7 @@ function profileToForm(user) {
     name: user.name,
     bio: user.bio ?? '',
     college: user.college ?? '',
+    openToAnySkill: user.openToAnySkill === true,
     skillsToTeach: (user.skillsToTeach ?? []).map((entry) => ({
       skill: getSkillId(entry.skill),
       proficiency: entry.proficiency,

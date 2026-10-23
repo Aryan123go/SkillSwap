@@ -1,139 +1,202 @@
 # SkillSwap
 
-SkillSwap is a free student-to-student skill exchange platform. Students discover learning partners, receive deterministic recommendations based on complementary skills, and manage exchange requests. All registered students have access to all core features: there are no paid tiers, subscriptions, membership fees, payment flows, or plan-based limits.
-
-## Requirements
-
-- Node.js 20.19+ or 22.12+
-- MongoDB Atlas connection string
-
-## Setup
-
-1. Run `npm install` from the repository root.
-2. Copy `server/.env.example` to `server/.env` and provide `MONGODB_URI` and a strong `JWT_SECRET` (at least 32 characters). Keep this file private.
-3. Copy `client/.env.example` to `client/.env` only if the API needs a non-default base URL.
-4. Start the API with `npm run dev:server`.
-5. Start Vite in a second terminal with `npm run dev`.
-
-The API connects to MongoDB and initializes the skill catalogue before listening on `PORT`. Start the API and frontend in separate terminals for local development. The frontend uses HTTP-only cookie authentication and never persists session state in local storage.
-
-## Commands
-
-- `npm run dev` — start the frontend
-- `npm run dev:server` — start the API in watch mode
-- `npm run build` — build the frontend
-- `npm run lint` — lint frontend sources
-- `npm test --workspace server` — run backend tests
-- `npm start` — start the API
+**SkillSwap** is a student-to-student skill exchange platform. Students can discover peers with complementary skills, request an exchange, arrange learning sessions, chat privately, and review one another after completed sessions. The project is free to use: it has no paid tiers, subscriptions, or payment flow.
 
 ## Features
 
-- JWT-backed student accounts, editable profiles, and a persistent skill catalogue.
-- Authenticated, paginated student discovery with case-insensitive name/skill search and filters for teaching skill, learning skill, proficiency, and college.
-- One canonical JavaScript match scorer is used for discovery and recommendations. Per direction, distinct exact skill matches award 10 points each and alias-only matches award 7 each, capped at 30 skill points. Each distinct match with a known teacher proficiency equal to or above the learner's earns 5 points, capped at 10 proficiency points per direction. Matching in both directions earns a 20-point mutual-exchange bonus. The integer score ranges from 0 to 100 and is a ranking indicator, not a probability.
-- Exchange requests can be sent for a student's learning interests, with an optional offered skill and introductory message. Recipients can accept or reject pending requests; senders can cancel pending requests. Decisions are atomic, and only the two participants can view a request.
-- Either student in an accepted exchange can propose a session. The other participant can confirm or decline; either participant can cancel or propose a reschedule. Rescheduling returns the session to `PROPOSED`, requiring the other participant to confirm the new time.
-- Private real-time text chat between participants of accepted exchange requests, with MongoDB-persisted messages and REST history fallback.
-- Completed sessions support one 1–5 star review from each participant. Profile reputation is calculated from eligible reviews, and written feedback is optional.
-- File uploads, group chat, video calls, notifications, AI services, and payment features are not included.
+- Student registration, login, logout, and profile editing.
+- A skill catalogue with teaching and learning skills and proficiency levels.
+- Searchable, filterable student discovery and explainable skill-match recommendations.
+- Exchange requests with accept, reject, and cancel workflows.
+- Session proposals, confirmation, decline, cancellation, and rescheduling.
+- Private real-time chat using Socket.IO, with persisted message history.
+- Unread-message indicators and inbox updates.
+- Reviews for completed sessions and profile reputation summaries.
+- Responsive UI with light and dark themes.
+- Development-only demo-profile seeding for testing two-account workflows.
 
-## API
+## Technology stack
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout` (authenticated)
-- `GET /api/auth/me` (authenticated)
-- `GET /api/users/me` (authenticated)
-- `PUT /api/users/me` (authenticated)
-- `GET /api/users/:id`
-- `GET /api/skills`
-- `GET /api/users/discover` (authenticated; `q`, `teachingSkill`, `learningSkill`, `proficiency`, `college`, `page`, `limit`)
-- `GET /api/users/recommendations` (authenticated; same filters, returns complementary matches only)
-- `POST /api/exchange-requests` (authenticated)
-- `GET /api/exchange-requests/sent` (authenticated; paginated)
-- `GET /api/exchange-requests/received` (authenticated; paginated)
-- `GET /api/exchange-requests/:id` (authenticated participant only)
-- `PATCH /api/exchange-requests/:id/accept` (authenticated recipient; pending only)
-- `PATCH /api/exchange-requests/:id/reject` (authenticated recipient; pending only)
-- `PATCH /api/exchange-requests/:id/cancel` (authenticated sender; pending only)
-- `GET /api/exchange-requests/accepted` (authenticated participant; paginated)
-- `POST /api/sessions` (authenticated participant; propose for an accepted request)
-- `GET /api/sessions` (authenticated participant; optional `status`, `period=upcoming|past`, `page`, `limit`)
-- `GET /api/sessions/:id` (authenticated participant only)
-- `GET /api/conversations` (authenticated; conversations for accepted exchanges)
-- `GET /api/conversations/by-request/:requestId` (authenticated participant in an accepted exchange)
-- `GET /api/conversations/:id` (authenticated participant only)
-- `GET /api/conversations/:id/messages?page=1&limit=50` (authenticated participant only; limit max 100)
-- `POST /api/conversations/:id/messages` (authenticated participant only; `content` required, max 2,000 characters)
-- `PATCH /api/sessions/:id/confirm` (other participant; proposed only)
-- `PATCH /api/sessions/:id/decline` (other participant; proposed only)
-- `PATCH /api/sessions/:id/cancel` (either participant; proposed or confirmed)
-- `PATCH /api/sessions/:id/reschedule` (either participant; proposed or confirmed; requires new `startAt` and `endAt`)
-- `PATCH /api/sessions/:id/complete` (either participant; confirmed and after the scheduled end)
-- `GET /api/reviews/eligible` (authenticated student; completed sessions not yet reviewed)
-- `POST /api/reviews` (authenticated participant; completed session, integer rating 1–5, optional comment up to 500 characters)
-- `GET /api/reviews/user/:userId` (authenticated; reputation summary and up to 50 recent eligible reviews)
+| Area | Technologies |
+|---|---|
+| Frontend | React 19, React Router 7, Vite 8, JavaScript, CSS |
+| Backend | Node.js, Express 5, JavaScript ES modules |
+| Database | MongoDB, Mongoose 8 |
+| Authentication | JWT in an HTTP-only cookie, `bcryptjs`, `cookie-parser` |
+| Real-time messaging | Socket.IO server and client |
+| Validation and security | Zod, CORS allowlist, Express JSON size limit, server-side authorization and validation |
+| Testing and quality | Node.js test runner, Oxlint, Vite production build |
+| Package management | npm workspaces and `package-lock.json` |
 
-Discovery responses contain only public profile fields and safe skill records. Match results include score components, distinct matched skills, and explanations based on the actual matches. Request bodies accept `recipient`, `requestedSkill`, optional `offeredSkill`, and optional `message`; clients cannot set status or sender identity, and recipient selection is checked against the authenticated student. Session organizer and participants are derived from the accepted request and authenticated user; clients cannot provide participant IDs.
+## Repository structure
 
-## Database and request lifecycle
+```text
+SkillSwap/
+├── client/
+│   ├── public/             # Static public assets
+│   ├── src/                # React pages, components, API client, styles
+│   ├── .env.example        # Frontend environment-variable example
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── server/
+│   ├── src/                # Express app, routes, controllers, models, services
+│   ├── scripts/            # Development-only demo-data utilities
+│   ├── test/               # Backend tests
+│   ├── .env.example        # Backend environment-variable example
+│   └── package.json
+├── DEMO_DATA.md            # Safe demo data and two-account testing guide
+├── .gitignore
+├── package.json            # npm workspace scripts
+├── package-lock.json
+└── README.md
+```
 
-`ExchangeRequest` references the sender, recipient, and catalogue skills; it does not duplicate profile data. Its statuses are `PENDING`, `ACCEPTED`, `REJECTED`, and `CANCELLED`. A partial unique index prevents duplicate pending requests for a sender/recipient/requested-skill tuple while allowing a later request after rejection or cancellation. Status transitions use conditional atomic updates to prevent competing actions from both succeeding.
+## Requirements
 
-`Session` references the accepted exchange request, organizer, exactly two distinct participants, title/notes, UTC-compatible MongoDB `Date` start/end values, and status. Sessions must start in the future and last 15 minutes to 4 hours. The frontend converts local date-time inputs into ISO timestamps and displays returned dates in the viewer's local timezone. Calendar availability is not checked.
+- Node.js **20.19+** or **22.12+** (use a supported Node.js LTS release compatible with Vite 8).
+- npm, included with Node.js.
+- A MongoDB database, such as MongoDB Atlas.
 
-Permitted session transitions:
+## Run locally
 
-| Current status | Action | Next status | Permission |
-|---|---|---|---|
-| `PROPOSED` | confirm / decline | `CONFIRMED` / `DECLINED` | Other participant only |
-| `PROPOSED` | cancel | `CANCELLED` | Either participant |
-| `PROPOSED` | reschedule | `PROPOSED` | Either participant becomes organizer; other participant must confirm |
-| `CONFIRMED` | cancel | `CANCELLED` | Either participant |
-| `CONFIRMED` | reschedule | `PROPOSED` | Either participant becomes organizer; other participant must confirm |
-| `CONFIRMED` | complete | `COMPLETED` | Either participant after scheduled end |
-| `DECLINED`, `CANCELLED`, `COMPLETED` | — | terminal | No reopening |
+### 1. Install dependencies
 
-Status updates use conditional MongoDB updates. Confirm/decline and terminal transitions require the expected current status. Rescheduling compares an internal revision counter so competing schedule proposals cannot silently overwrite one another.
+From the repository root:
 
-`Review` records identify their session, authenticated reviewer, other session participant, integer rating, and optional feedback. A unique `(session, reviewer)` index prevents concurrent duplicate submissions. Reputation is calculated from reviews tied to existing completed sessions with two valid participants; stored or malformed ratings and reviews unrelated to the session participants are excluded.
+```bash
+npm install
+```
 
-### Matching formula and alias resolution
+### 2. Configure the backend
 
-For each direction:
+Copy `server/.env.example` to `server/.env` and set the values:
 
-1. Give 10 points per distinct exact normalized-name match or 7 points per alias-only match; cap this component at 30.
-2. Give 5 additional points per distinct match where both proficiency values are known and the teacher's level is equal to or higher than the learner's; cap this component at 10.
-3. Add a 20-point bonus once if both directions have at least one valid complementary match.
+```dotenv
+PORT=5000
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-host>/<database>
+JWT_SECRET=<a-random-secret-at-least-32-characters-long>
+CLIENT_URL=http://localhost:5173
+NODE_ENV=development
+```
 
-Examples: one compatible exact match in one direction scores `10 + 5 = 15`; one compatible alias-only match scores `7 + 5 = 12`; one compatible exact match each way scores `15 + 15 + 20 = 50`. Two directions at their full component caps plus mutual exchange score `30 + 10 + 30 + 10 + 20 = 100`.
+Use your actual MongoDB connection string locally. URL-encode special characters in database credentials when required. Keep `server/.env` private and never commit it.
 
-Skill names and aliases are case-insensitive and trimmed. Duplicate terms, including an alias repeating its own skill name, do not count twice. Within a direction, records linked through normalized names or explicit catalogue aliases form one logical match group. Each group contributes points and a `mutualMatchCount` entry only once. Exact matches take precedence over aliases in the group. In an ambiguous alias collision, choose an exact pair first, otherwise resolve by normalized skill name and catalogue ID; return the chosen existing skill record and do not modify catalogue data. Proficiency compatibility is counted once per group only when the selected representative pair has valid levels and the teacher meets the learner's level, so an incompatible exact match is not concealed by a conflicting alias record.
+### 3. Configure the frontend if needed
 
-Discovery's base filters and recommendation skill-ID filters run in MongoDB and populate only selected public profile and skill fields. The canonical scorer and ordering run in JavaScript before pagination, preserving globally correct pages. Unfiltered discovery still needs to rank every matching student; very large deployments may need a ranking/search store while preserving the canonical scoring service.
+For local development, the Vite proxy sends `/api` and `/socket.io` requests to `http://localhost:5000` by default, so `client/.env` is normally unnecessary. If the API is hosted at another origin, copy `client/.env.example` to `client/.env` and set:
 
-## Commands and environment
+```dotenv
+VITE_API_URL=http://localhost:5000
+```
 
-Required server variables: `MONGODB_URI`, `JWT_SECRET` (at least 32 characters), and `CLIENT_URL` (one or more comma-separated allowed frontend origins). `PORT` is optional. `VITE_API_URL` is optional; leave it unset for same-origin deployments or set it to the API origin as needed. Never commit `.env` files or credentials.
+Do not add a trailing slash. A `VITE_` variable is bundled into frontend code, so **never put secrets in it**.
 
-Vercel can host the frontend and free-tier-compatible services can be used for MongoDB Atlas and API hosting, subject to provider limits and terms. Configure the production `CLIENT_URL`, frontend API URL, and MongoDB network access for the chosen deployment. No paid API key or AI service is needed.
+### 4. Start the application
 
-See `client/.env.example` and `server/.env.example` for variable names and examples without credentials. The frontend bundles system fonts locally and does not require a third-party font request. Auth middleware loads only the current user's required account fields; skill profiles are populated only by endpoints that need them. Sent/received request histories use a single paginated aggregation; accepted requests and sessions use bounded pagination.
+Open two terminals in the repository root.
+
+Terminal 1 — backend:
+
+```bash
+npm run dev:server
+```
+
+Terminal 2 — frontend:
+
+```bash
+npm run dev
+```
+
+Open the local URL printed by Vite, usually `http://localhost:5173`. The API health endpoint is `http://localhost:5000/api/health`.
+
+## Available commands
+
+Run these from the repository root:
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start the Vite frontend |
+| `npm run dev:server` | Start the backend in watch mode |
+| `npm run build` | Build the frontend for production |
+| `npm run preview` | Preview the built frontend locally |
+| `npm run lint` | Lint frontend source with Oxlint |
+| `npm test` | Run backend tests |
+| `npm run check` | Run frontend lint, frontend build, and backend tests |
+| `npm start` | Start the backend in production mode |
+
+## Environment variables
+
+### Backend (`server/.env`)
+
+| Variable | Required | Description |
+|---|---|---|
+| `MONGODB_URI` | Yes | MongoDB connection string. The server uses the `skillswap` database name. |
+| `JWT_SECRET` | Yes | Random secret of at least 32 characters used to sign authentication tokens. |
+| `CLIENT_URL` | Yes | Comma-separated list of allowed frontend origins, without paths. |
+| `PORT` | No | Port for the API; defaults to `5000`. Hosting providers often set this automatically. |
+| `NODE_ENV` | Recommended | Set to `production` in production and `development` locally. Controls production cookie and origin behavior. |
+
+### Frontend (`client/.env`)
+
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_URL` | No | API origin when frontend and backend are hosted separately. Leave unset when using same-origin API routing. |
+
+Only commit the `.env.example` files. Do not commit `.env`, real credentials, database dumps, or production tokens.
+
+## Testing before release
+
+Run:
+
+```bash
+npm run check
+```
+
+This executes frontend linting, a production build, and backend tests. Passing these checks does not replace end-to-end testing. Before launch, manually test registration/login, profile edits, discovery and filters, requests, session lifecycle, chat and unread indicators, reviews, and both themes on desktop and mobile.
+
+For a safe fictional-profile seeding guide and a two-account demo workflow, see [`DEMO_DATA.md`](./DEMO_DATA.md). Only seed a dedicated development/test database; never point demo seeding at production.
+
+## Deployment overview
+
+The included [`render.yaml`](./render.yaml) deploys the Vite frontend, Express API, and Socket.IO server as one same-origin Render web service, with MongoDB Atlas for persistent data. This preserves the existing HTTP-only cookie authentication and real-time chat without exposing secrets in the frontend.
+
+### Free hobby/demo deployment on Render
+
+1. Push the project to a GitHub repository and create a new Blueprint on [Render](https://dashboard.render.com/blueprints) from that repository. Keep the repository private if it contains work you do not want public.
+2. Render reads `render.yaml`. Choose the **Free** instance when prompted, then enter the MongoDB Atlas URI for `MONGODB_URI` in Render's secret environment-variable form. Render generates `JWT_SECRET`; do not put either value in Git, a `VITE_` variable, or chat.
+3. In MongoDB Atlas, create a dedicated application database user with only the permissions this app needs. Under Network Access, allow the service's outbound IP ranges shown in its Render dashboard, rather than opening access to every IP when the ranges are available. Keep Atlas authentication and TLS enabled.
+4. Wait for the Render deployment to finish, then open the generated `https://<service>.onrender.com` URL. The frontend and `/api/health` endpoint use that same origin; Render supplies the origin to the app automatically.
+5. Test registration, login persistence, profile edits, discovery, requests, sessions, chat/unread indicators, and reviews in a fresh browser session. Verify that a browser reload on `/discover` or `/profile/edit` works.
+
+The free Render web service spins down after 15 minutes without inbound traffic, including WebSocket traffic, and may take about a minute to wake up. Free services have ephemeral filesystems and Render explicitly recommends them for hobby/testing rather than production. MongoDB Atlas is separate; confirm its current free-cluster terms, backup policy, and limits before using real student data. Never use demo seeding against the production database.
+
+Vercel is not the selected target for this single-service deployment: the current app expects a shared long-running Express/Socket.IO process. Vercel's serverless/WebSocket support has different lifecycle and scaling constraints and would need a separate chat architecture. Avoid splitting the frontend and API onto unrelated free domains unless you deliberately configure and test cross-site cookie behavior.
+
+Do not add production secrets to this repository. Keep `MONGODB_URI` and `JWT_SECRET` only in the hosting provider's protected environment settings. For an actual production service with reliable wake-free chat, backups, and stable database network access, use paid hosting and verify its current pricing before upgrading.
+
+## API overview
+
+The API is mounted under `/api` and includes routes for:
+
+- `/auth` — register, login, logout, current session.
+- `/users` — own profile, public profiles, discovery, recommendations.
+- `/skills` — skill catalogue.
+- `/exchange-requests` — exchange request lifecycle.
+- `/sessions` — session lifecycle.
+- `/conversations` — chat conversations and message history.
+- `/reviews` — eligible reviews and reputation.
+- `/health` — service health check.
+
+Protected routes require a valid authenticated session. The backend enforces ownership and participant authorization; the frontend should not be treated as a security boundary.
 
 ## Known limitations
 
-- There is no live update service; request and session lists can be manually refreshed.
-- Session completion is a participant action after the scheduled end; sessions are not automatically completed.
-- The scheduling workflow does not check calendar availability or provide video conferencing.
-- Matching uses existing skill names, explicit aliases, and proficiency values; it does not use paid AI, popularity, or unrelated skills.
-- Backend tests cover scoring, validation, session model constraints, and unauthenticated API access. Database-backed exchange/session lifecycle scenarios should also be verified against a configured MongoDB test database before production use.
+- Request and session lists may require refresh; the app does not provide a universal live-activity feed.
+- Sessions are not automatically completed, and scheduling does not check calendar availability or provide video calls.
+- The app does not include file uploads, group chat, AI services, or payment features.
+- Match scores rank complementary skill matches; they are not probabilities of a successful exchange.
 
+## License
 
-## Phase 6 updates
-
-Phase 6 improves session-page resilience and chat unread-message handling. See [`PHASE6_CHANGELOG.md`](./PHASE6_CHANGELOG.md) for the changed files, API behavior, and verification steps.
-
-
-## Reviews & reputation (Phase 6)
-
-After a session is marked `COMPLETED`, each participant can leave the other participant one 1–5 star rating and optional written feedback. Student profiles show the average rating, number of reviews, and recent feedback. Reviews are available from the **Reviews** navigation page. Only completed-session participants may review each other; duplicate reviews for a session are rejected.
+No license has been declared yet. If you intend others to reuse or modify this project publicly, choose and add an appropriate license before publishing.

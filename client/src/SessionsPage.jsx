@@ -26,6 +26,13 @@ function formatLocalTime(value) {
   }).format(date)
 }
 
+function SessionTimeRange({ startAt, endAt }) {
+  return <div className="session-time-range" aria-label="Session start and end times">
+    <p><span>Starts</span><strong>{formatLocalTime(startAt)}</strong></p>
+    <p><span>Ends</span><strong>{formatLocalTime(endAt)}</strong></p>
+  </div>
+}
+
 function toLocalInput(value) {
   const date = new Date(value)
   if (!value || Number.isNaN(date.getTime())) return ''
@@ -53,7 +60,7 @@ function SessionCard({ session, userId }) {
     <p className="session-partner">{otherParticipant
       ? <Link to={`/profile/${participantId(otherParticipant)}`}>{otherParticipant.name}</Link>
       : 'Exchange participant'}</p>
-    <p className="session-time"><strong>{formatLocalTime(session.startAt)}</strong> – {formatLocalTime(session.endAt)}</p>
+    <SessionTimeRange startAt={session.startAt} endAt={session.endAt} />
     {session.description && <p className="session-description">{session.description}</p>}
     <Link className="secondary-button" to={`/sessions/${session._id}`}>View session</Link>
   </article>
@@ -329,7 +336,7 @@ export function SessionDetailPage() {
     {!isLoading && !error && session && <>
       <section className="content-card session-detail-card">
         <div className="session-card-heading"><div><span className="section-kicker">CURRENT STATUS</span><h2>{session.title}</h2></div><span className={`request-status status-${String(session.status ?? 'unknown').toLowerCase()}`}>{String(session.status ?? 'unknown').toLowerCase()}</span></div>
-        <p className="session-time"><strong>{formatLocalTime(session.startAt)}</strong> – {formatLocalTime(session.endAt)}</p>
+        <SessionTimeRange startAt={session.startAt} endAt={session.endAt} />
         <p className="form-hint">Start and end times are converted to the viewer's local timezone ({timeZone}).</p>
         {session.description && <p className="session-description">{session.description}</p>}
         <div className="session-participants"><span className="section-kicker">PARTICIPANTS</span><div>{(Array.isArray(participants) ? participants : []).filter(Boolean).map((participant) => <Link key={participantId(participant)} to={`/profile/${participantId(participant)}`}>{participant.name ?? 'SkillSwap student'}</Link>)}</div></div>

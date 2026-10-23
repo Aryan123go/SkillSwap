@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js'
 import Skill from '../src/models/Skill.js'
 import Session from '../src/models/Session.js'
 import User from '../src/models/User.js'
+import Review from '../src/models/Review.js'
 import { discoverStudents } from '../src/services/matching.service.js'
 import { createSessionSchema, rescheduleSessionSchema, sessionListQuerySchema } from '../src/validators/session.validator.js'
 
@@ -122,6 +123,28 @@ test('teacher below learner proficiency receives no compatibility bonus', () => 
   assert.equal(details.matchReasons.some((reason) => reason.includes('Proficiency')), false)
 })
 
+test('open-to-any preferences match actual skills without assuming a proficiency level', () => {
+  const details = calculateMatchDetails(
+    {
+      openToAnySkill: false,
+      skillsToLearn: [entry('React', 'EXPERT')],
+      skillsToTeach: [entry('Guitar', 'ADVANCED')],
+    },
+    {
+      openToAnySkill: true,
+      skillsToTeach: [entry('React', 'ADVANCED')],
+      skillsToLearn: [],
+    },
+  )
+  assert.equal(details.skillsTheyCanTeachMe.length, 1)
+  assert.equal(details.skillsICanTeachThem.length, 1)
+  assert.equal(details.scoreComponents.proficiencyBonus.theyCanTeachMe, 0)
+  assert.equal(details.scoreComponents.proficiencyBonus.iCanTeachThem, 0)
+  assert.equal(details.scoreComponents.mutualExchangeBonus, 20)
+  assert.equal(details.matchScore, 40)
+  assert.ok(details.matchReasons.some((reason) => reason.includes('Open to learning skills you can teach')))
+})
+
 test('equal proficiency is compatible', () => {
   const details = calculateMatchDetails(
     student([entry('React', 'ADVANCED')]),
@@ -199,6 +222,7 @@ test('all calculated scores are integer values between zero and one hundred', ()
 })
 
 test('discovery uses canonical ranking before pagination and returns no private user fields', async (t) => {
+  t.mock.method(Review, 'aggregate', async () => [])
   const candidates = [
     {
       _id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
@@ -238,7 +262,43 @@ test('discovery uses canonical ranking before pagination and returns no private 
   assert.equal('passwordHash' in firstPage.students[0], false)
 })
 
+test('discovery applies verified minimum ratings before pagination', async (t) => {
+  const highRatedId = 'bbbbbbbbbbbbbbbbbbbbbbbb'
+  const nextHighRatedId = 'cccccccccccccccccccccccc'
+  const candidates = [
+    { _id: highRatedId, name: 'A High Rating', skillsToTeach: [entry('React', 'ADVANCED')], skillsToLearn: [] },
+    { _id: 'aaaaaaaaaaaaaaaaaaaaaaaa', name: 'B New Student', skillsToTeach: [entry('React', 'ADVANCED')], skillsToLearn: [] },
+    { _id: nextHighRatedId, name: 'C Meets Threshold', skillsToTeach: [entry('React', 'ADVANCED')], skillsToLearn: [] },
+    { _id: 'dddddddddddddddddddddddd', name: 'D Below Threshold', skillsToTeach: [entry('React', 'ADVANCED')], skillsToLearn: [] },
+  ]
+  t.mock.method(Review, 'aggregate', async () => [
+    { _id: highRatedId, averageRating: 4.8, reviewCount: 3 },
+    { _id: nextHighRatedId, averageRating: 4, reviewCount: 1 },
+    { _id: 'dddddddddddddddddddddddd', averageRating: 3.99, reviewCount: 2 },
+  ])
+  t.mock.method(User, 'find', () => ({
+    select() { return this },
+    populate() { return this },
+    lean: async () => candidates,
+  }))
+
+  const matchingStudent = {
+    _id: '0123456789abcdef01234567',
+    skillsToLearn: [entry('React')],
+    skillsToTeach: [],
+  }
+  const firstPage = await discoverStudents(matchingStudent, { page: 1, limit: 1, minRating: '4' })
+  const secondPage = await discoverStudents(matchingStudent, { page: 2, limit: 1, minRating: '4' })
+
+  assert.equal(firstPage.pagination.total, 2)
+  assert.equal(firstPage.pagination.pages, 2)
+  assert.equal(firstPage.students[0].id, highRatedId)
+  assert.equal(secondPage.students[0].id, nextHighRatedId)
+  assert.ok([...firstPage.students, ...secondPage.students].every((item) => item.reputation.averageRating >= 4))
+})
+
 test('recommendations use catalogue aliases to narrow candidates and canonical score details', async (t) => {
+  t.mock.method(Review, 'aggregate', async () => [])
   const candidate = {
     _id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
     name: 'JavaScript tutor',
@@ -311,6 +371,9 @@ test('discovery validates IDs, proficiency, and bounded pagination', () => {
   assert.equal(discoveryQuerySchema.safeParse({ page: '999999999999999999999999' }).success, false)
   assert.equal(discoveryQuerySchema.safeParse({ limit: '51' }).success, false)
   assert.equal(discoveryQuerySchema.safeParse({ teachingSkill: 'not-an-id' }).success, false)
+  assert.equal(discoveryQuerySchema.safeParse({ minRating: '4' }).success, true)
+  assert.equal(discoveryQuerySchema.safeParse({ minRating: '0' }).success, false)
+  assert.equal(discoveryQuerySchema.safeParse({ minRating: '4.5' }).success, false)
   assert.equal(discoveryQuerySchema.safeParse({ sort: 'popular' }).success, false)
 })
 
@@ -318,6 +381,7 @@ test('request validation cannot set status, sender, or arbitrary extra fields', 
   const valid = createExchangeRequestSchema.safeParse({
     recipient: '0123456789abcdef01234567',
     requestedSkill: 'fedcba987654321001234567',
+    offeredSkill: 'fedcba987654321001234568',
     message: '  Hello!  ',
   })
   assert.equal(valid.success, true)
@@ -326,6 +390,10 @@ test('request validation cannot set status, sender, or arbitrary extra fields', 
     recipient: '0123456789abcdef01234567',
     requestedSkill: 'fedcba987654321001234567',
     status: 'ACCEPTED',
+  }).success, false)
+  assert.equal(createExchangeRequestSchema.safeParse({
+    recipient: '0123456789abcdef01234567',
+    requestedSkill: 'fedcba987654321001234567',
   }).success, false)
   assert.equal(createExchangeRequestSchema.safeParse({
     recipient: '0123456789abcdef01234567',

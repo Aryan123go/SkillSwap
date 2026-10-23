@@ -34,11 +34,13 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       maxlength: 254,
     },
+    demoSeedKey: { type: String, select: false, default: undefined },
     passwordHash: { type: String, required: true, select: false },
     profileImage: { type: String, trim: true, maxlength: 2048, default: '' },
     bio: { type: String, trim: true, maxlength: 500, default: '' },
     college: { type: String, trim: true, maxlength: 120, default: '' },
     role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT' },
+    openToAnySkill: { type: Boolean, default: false },
     skillsToTeach: { type: [userSkillSchema], default: [] },
     skillsToLearn: { type: [userSkillSchema], default: [] },
     availability: { type: availabilitySchema, default: () => ({}) },
@@ -53,6 +55,7 @@ userSchema.index({ role: 1, 'skillsToLearn.skill': 1 })
 userSchema.set('toJSON', {
   transform(_document, result) {
     delete result.passwordHash
+    delete result.demoSeedKey
     delete result.__v
     return result
   },

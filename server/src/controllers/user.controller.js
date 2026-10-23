@@ -61,6 +61,7 @@ export async function updateMyProfile(request, response) {
         name: input.name,
         bio: input.bio,
         college: input.college,
+        ...(input.openToAnySkill === undefined ? {} : { openToAnySkill: input.openToAnySkill }),
         skillsToTeach,
         skillsToLearn,
         ...(input.profileImage === undefined ? {} : { profileImage: input.profileImage }),
@@ -79,7 +80,7 @@ export async function getPublicProfile(request, response) {
     throw new HttpError(404, 'This profile could not be found.', 'USER_NOT_FOUND')
   }
   const user = await User.findById(request.params.id)
-    .select('name profileImage bio college skillsToTeach skillsToLearn createdAt')
+    .select('name profileImage bio college openToAnySkill skillsToTeach skillsToLearn createdAt')
     .populate('skillsToTeach.skill', 'name category aliases')
     .populate('skillsToLearn.skill', 'name category aliases')
   if (!user) throw new HttpError(404, 'This profile could not be found.', 'USER_NOT_FOUND')

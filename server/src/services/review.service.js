@@ -108,6 +108,22 @@ export async function createReview(user, input) {
   }
 }
 
+export async function getUserReviewSummaries(userIds) {
+  const validIds = [...new Set((userIds ?? []).filter((id) => mongoose.isValidObjectId(id)).map((id) => id.toString()))]
+  if (!validIds.length) return {}
+
+  const summaries = await Review.aggregate([
+    ...validReviewStages(),
+    { $match: { reviewee: { $in: validIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+    { $group: { _id: '$reviewee', averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } },
+  ])
+
+  return Object.fromEntries(summaries.map((summary) => [summary._id.toString(), {
+    averageRating: Math.round(summary.averageRating * 100) / 100,
+    reviewCount: summary.reviewCount,
+  }]))
+}
+
 export async function getUserReviewSummary(userId) {
   if (!mongoose.isValidObjectId(userId)) throw new HttpError(404, 'This profile could not be found.', 'USER_NOT_FOUND')
   const userExists = await User.exists({ _id: userId })

@@ -8,6 +8,7 @@ export const discoveryQuerySchema = z.object({
   learningSkill: objectId.optional(),
   proficiency: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
   college: z.string().trim().max(120).optional().default(''),
+  minRating: z.enum(['1', '2', '3', '4', '5']).optional(),
   page: z.string().regex(/^[1-9]\d*$/).optional().default('1'),
   limit: z.string().regex(/^[1-9]\d*$/).optional().default('12'),
 }).strict().superRefine((value, context) => {

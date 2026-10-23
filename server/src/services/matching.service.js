@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import Skill from '../models/Skill.js'
 import User from '../models/User.js'
+import { getUserReviewSummaries } from './review.service.js'
 import { normalizeSkill } from '../utils/normalizeSkill.js'
 
 const SCORE_WEIGHTS = Object.freeze({
@@ -67,7 +68,7 @@ function compareEntries(left, right) {
   return idString(getSkill(left)).localeCompare(idString(getSkill(right)), 'en')
 }
 
-function scoreDirection(teacherEntries, learnerEntries, returnedSide) {
+function scoreDirection(teacherEntries, learnerEntries, returnedSide, { unknownLearnerLevel = false } = {}) {
   const teachers = uniqueEntries(teacherEntries)
   const learners = uniqueEntries(learnerEntries)
   const entries = [...teachers, ...learners]
@@ -103,7 +104,7 @@ function scoreDirection(teacherEntries, learnerEntries, returnedSide) {
 
       const logicalSkill = find(teacherIndex)
       const exact = skillName(teacherSkill) === skillName(learnerSkill)
-      const learnerLevel = proficiencyValue(learner)
+      const learnerLevel = unknownLearnerLevel ? undefined : proficiencyValue(learner)
       const compatible = teacherLevel !== undefined
         && learnerLevel !== undefined
         && teacherLevel >= learnerLevel
@@ -155,15 +156,23 @@ function scoreDirection(teacherEntries, learnerEntries, returnedSide) {
 }
 
 export function calculateMatchDetails(student, candidate) {
+  const studentLearningEntries = student.openToAnySkill
+    ? candidate.skillsToTeach
+    : student.skillsToLearn
   const theyCanTeachMe = scoreDirection(
     candidate.skillsToTeach,
-    student.skillsToLearn,
+    studentLearningEntries,
     'teacher',
+    { unknownLearnerLevel: student.openToAnySkill === true },
   )
+  const openLearningEntries = candidate.openToAnySkill
+    ? student.skillsToTeach
+    : candidate.skillsToLearn
   const iCanTeachThem = scoreDirection(
     student.skillsToTeach,
-    candidate.skillsToLearn,
+    openLearningEntries,
     'learner',
+    { unknownLearnerLevel: candidate.openToAnySkill === true },
   )
   const mutual = theyCanTeachMe.entries.length > 0 && iCanTeachThem.entries.length > 0
   const mutualExchangeBonus = mutual ? SCORE_WEIGHTS.mutualExchange : 0
@@ -174,7 +183,9 @@ export function calculateMatchDetails(student, candidate) {
     matchReasons.push(`Can teach you ${theyCanTeachMe.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`)
   }
   if (iCanTeachThem.entries.length) {
-    matchReasons.push(`Wants to learn ${iCanTeachThem.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`)
+    matchReasons.push(candidate.openToAnySkill
+      ? `Open to learning skills you can teach: ${iCanTeachThem.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`
+      : `Wants to learn ${iCanTeachThem.entries.map((entry) => getSkill(entry)?.name).join(', ')}.`)
   }
   const compatibleCount = [
     theyCanTeachMe,
@@ -300,7 +311,11 @@ async function buildDiscoveryMatch(student, filters, recommendationsOnly) {
     ])
     const complementarySkills = []
     if (teachMeIds.length) complementarySkills.push({ 'skillsToTeach.skill': { $in: teachMeIds } })
-    if (teachThemIds.length) complementarySkills.push({ 'skillsToLearn.skill': { $in: teachThemIds } })
+    if (student.openToAnySkill) complementarySkills.push({ 'skillsToTeach.0': { $exists: true } })
+    if (teachThemIds.length) {
+      complementarySkills.push({ 'skillsToLearn.skill': { $in: teachThemIds } })
+      complementarySkills.push({ openToAnySkill: true, 'skillsToTeach.0': { $exists: true } })
+    }
     if (!complementarySkills.length) return null
     conditions.push({ $or: complementarySkills })
   }
@@ -348,7 +363,7 @@ export async function discoverStudents(student, filters, recommendationsOnly = f
   if (!match) return paginationResult([], filters.page, filters.limit)
 
   const candidates = await User.find(match)
-    .select('_id name profileImage bio college skillsToTeach skillsToLearn')
+    .select('_id name profileImage bio college openToAnySkill skillsToTeach skillsToLearn')
     .populate('skillsToTeach.skill', 'name normalizedName aliases category')
     .populate('skillsToLearn.skill', 'name normalizedName aliases category')
     .lean()
@@ -363,6 +378,7 @@ export async function discoverStudents(student, filters, recommendationsOnly = f
         profileImage: candidate.profileImage,
         bio: candidate.bio,
         college: candidate.college,
+        openToAnySkill: candidate.openToAnySkill === true,
         skillsToTeach: publicSkillEntries(candidate.skillsToTeach),
         skillsToLearn: publicSkillEntries(candidate.skillsToLearn),
         skillsTheyCanTeachMe: publicSkillEntries(details.skillsTheyCanTeachMe),
@@ -376,5 +392,17 @@ export async function discoverStudents(student, filters, recommendationsOnly = f
     .filter(Boolean)
     .sort(compareCandidates)
 
-  return paginationResult(rankedStudents, filters.page, filters.limit)
+  const reputations = await getUserReviewSummaries(rankedStudents.map((student) => student.id))
+  const studentsWithReputation = rankedStudents.map((student) => ({
+    ...student,
+    reputation: reputations[student.id] ?? { averageRating: null, reviewCount: 0 },
+  }))
+  const filteredByRating = filters.minRating
+    ? studentsWithReputation.filter((student) => (
+      student.reputation.averageRating !== null
+      && student.reputation.averageRating >= Number(filters.minRating)
+    ))
+    : studentsWithReputation
+
+  return paginationResult(filteredByRating, filters.page, filters.limit)
 }

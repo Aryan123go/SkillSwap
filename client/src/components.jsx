@@ -17,11 +17,21 @@ export function Header({ compact = false }) {
   const navigate = useNavigate()
   const [menuError, setMenuError] = React.useState('')
   const [unreadTotal, setUnreadTotal] = React.useState(0)
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false)
+  const [theme, setTheme] = React.useState(() => {
+    try { return window.localStorage.getItem('skillswap-theme') === 'dark' ? 'dark' : 'light' } catch { return 'light' }
+  })
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    document.body.dataset.theme = theme
+    try { window.localStorage.setItem('skillswap-theme', theme) } catch { /* Theme still works for this session. */ }
+  }, [theme])
   const apiOrigin = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
   const socketOrigin = apiOrigin || window.location.origin
+  const userId = user?.id
 
   React.useEffect(() => {
-    if (!user) return undefined
+    if (!userId) return undefined
     let active = true
     let refreshTimer
     const refreshUnread = async () => {
@@ -33,14 +43,14 @@ export function Header({ compact = false }) {
       }
     }
     void refreshUnread()
-    const socket = io(socketOrigin, { withCredentials: true, transports: ['websocket', 'polling'] })
+    const socket = io(socketOrigin, { withCredentials: true })
     socket.on('user:message', () => { void refreshUnread() })
     socket.on('user:read', () => { void refreshUnread() })
     // Reconcile missed socket events after reconnects and while the tab is idle.
     socket.on('connect', () => { void refreshUnread() })
     refreshTimer = window.setInterval(() => { void refreshUnread() }, 30000)
     return () => { active = false; window.clearInterval(refreshTimer); socket.disconnect() }
-  }, [user?.id, socketOrigin, location.pathname])
+  }, [userId, socketOrigin])
 
   async function handleSignOut() {
     setMenuError('')
@@ -53,9 +63,10 @@ export function Header({ compact = false }) {
   }
 
   return <>
-    <header className="topbar">
+    <header className={`topbar${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
       <Brand />
-      {!compact && user && <nav className="main-nav" aria-label="Main navigation">
+      {!compact && user && <button className="mobile-nav-toggle" type="button" aria-expanded={mobileNavOpen} aria-controls="primary-navigation" onClick={() => setMobileNavOpen((open) => !open)}><span aria-hidden="true">{mobileNavOpen ? '×' : '☰'}</span><span>{mobileNavOpen ? 'Close menu' : 'Menu'}</span></button>}
+      {!compact && user && <nav id="primary-navigation" className={`main-nav${mobileNavOpen ? ' is-open' : ''}`} aria-label="Main navigation" onClick={(event) => { if (event.target.closest('a')) setMobileNavOpen(false) }}>
         <NavLink to="/dashboard">Dashboard</NavLink>
         <NavLink to="/discover">Discover</NavLink>
         <NavLink to="/requests/sent">Sent requests</NavLink>
@@ -67,7 +78,8 @@ export function Header({ compact = false }) {
       </nav>}
       <div className="account-actions">
         {user ? <>
-          <span className="header-user">{user.name.split(' ')[0]}</span>
+          <Link className="header-user" to="/profile" aria-label="Open your profile">{user.name.split(' ')[0]}</Link>
+          <button className="theme-toggle" type="button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span className="theme-toggle-label">{theme === 'dark' ? 'Light' : 'Dark'}</span></button>
           <button className="login-button" onClick={handleSignOut}>Log out</button>
         </> : location.pathname === '/login' ? <>
           <Link className="join-button" to="/register">Sign up <ArrowIcon /></Link>
@@ -101,7 +113,7 @@ export function FormField({ label, error, ...props }) {
   </label>
 }
 
-export function SkillChoices({ title, skills, entries, onChange, description }) {
+export function SkillChoices({ title, skills, entries, onChange, description, openToAnySkill, onOpenToAnyChange }) {
   const [query, setQuery] = React.useState('')
   const visibleSkills = skills.filter((skill) => (
     `${skill.name} ${skill.category}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
@@ -125,8 +137,15 @@ export function SkillChoices({ title, skills, entries, onChange, description }) 
       <div><h3>{title}</h3><p>{description}</p></div>
       <span className="selection-count">{entries.length} selected</span>
     </div>
-    <input className="skill-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search the skill catalogue" aria-label={`Search ${title.toLowerCase()}`} />
-    {visibleSkills.length ? <div className="skill-options">
+    {onOpenToAnyChange && <label className="open-any-toggle">
+      <input type="checkbox" checked={openToAnySkill} onChange={(event) => onOpenToAnyChange(event.target.checked)} />
+      <span>Open to any skill</span>
+    </label>}
+    {openToAnySkill
+      ? <p className="open-any-description">You are open to learning any skill another student can teach. Your saved learning preferences will be kept if you turn this off.</p>
+      : <>
+        <input className="skill-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search the skill catalogue" aria-label={`Search ${title.toLowerCase()}`} />
+        {visibleSkills.length ? <div className="skill-options">
       {visibleSkills.map((skill) => {
         const entry = entries.find((item) => getSkillId(item.skill) === skill._id)
         return <div className={`skill-option${entry ? ' is-selected' : ''}`} key={skill._id}>
@@ -136,7 +155,8 @@ export function SkillChoices({ title, skills, entries, onChange, description }) 
           </select>}
         </div>
       })}
-    </div> : <p className="subtle-text">No catalogue skills match that search.</p>}
+        </div> : <p className="subtle-text">No catalogue skills match that search.</p>}
+      </>}
   </section>
 }
 

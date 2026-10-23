@@ -64,6 +64,19 @@ test('profile validation does not impose an artificial skill-count cap', () => {
   assert.equal(parsed.data.skillsToTeach.length, 101)
 })
 
+test('open-to-any profile preference is optional for older clients and accepts a boolean', () => {
+  const profile = {
+    name: 'Student Name',
+    bio: '',
+    college: '',
+    skillsToTeach: [],
+    skillsToLearn: [],
+  }
+  assert.equal(updateUserSchema.safeParse(profile).success, true)
+  assert.equal(updateUserSchema.safeParse({ ...profile, openToAnySkill: true }).data.openToAnySkill, true)
+  assert.equal(updateUserSchema.safeParse({ ...profile, openToAnySkill: 'yes' }).success, false)
+})
+
 test('development accepts loopback Vite fallback ports while production requires an allowlisted origin', async () => {
   const previousEnvironment = {
     nodeEnv: process.env.NODE_ENV,
